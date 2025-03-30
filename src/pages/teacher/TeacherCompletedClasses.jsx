@@ -41,6 +41,7 @@ const TeacherCompletedClasses = () => {
   const [classType, setClassType] = useState("");
   const [topicsTaught, setTopicsTaught] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -135,6 +136,7 @@ const TeacherCompletedClasses = () => {
   // Handle saving the session/class update
   const handleSaveUpdate = async () => {
     try {
+      setIsSubmitting(true);
       if (!selectedClass) return;
 
       // Prepare the payload
@@ -207,6 +209,7 @@ const TeacherCompletedClasses = () => {
         variant: "destructive",
       });
     } finally {
+      setIsSubmitting(false);
       handleCloseDialog();
       fetchClasses();
     }
@@ -306,8 +309,8 @@ const TeacherCompletedClasses = () => {
         <hr className="my-4" />
 
         {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <p>Loading classes data...</p>
+          <div className="w-full flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -441,7 +444,7 @@ const TeacherCompletedClasses = () => {
             <Button type="button" variant="outline" onClick={handleCloseDialog}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleSaveUpdate}>
+            <Button type="button" onClick={handleSaveUpdate} disabled={isSubmitting}>
               Save Changes
             </Button>
           </DialogFooter>

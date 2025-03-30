@@ -61,6 +61,8 @@ const ViewTeacherClasses = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [remarks, setRemarks] = useState("");
   const [disputeAction, setDisputeAction] = useState("resolve");
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDisputeSubmitting, setIsDisputeSubmitting] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -200,6 +202,7 @@ const ViewTeacherClasses = () => {
   // Save admin updates
   const handleSaveUpdate = async () => {
     try {
+      setIsSubmitting(true);
       if (!selectedClass) return;
 
       const payload = {
@@ -267,6 +270,7 @@ const ViewTeacherClasses = () => {
         variant: "destructive",
       });
     } finally {
+      setIsSubmitting(false);
       setIsUpdateDialogOpen(false);
       fetchData();
     }
@@ -275,6 +279,7 @@ const ViewTeacherClasses = () => {
   // Handle dispute resolution
   const handleResolveDispute = async () => {
     try {
+      setIsDisputeSubmitting(true);
       if (!selectedClass || !remarks) {
         toast({
           title: "Error",
@@ -347,6 +352,7 @@ const ViewTeacherClasses = () => {
         variant: "destructive",
       });
     } finally {
+      setIsDisputeSubmitting(false);
       setIsDisputeDialogOpen(false);
       fetchData();
     }
@@ -469,7 +475,7 @@ const ViewTeacherClasses = () => {
   const getDisputeBadge = (dispute) => {
     if (!dispute?.reason) return null;
     return dispute.isResolved ? (
-      <Badge className="bg-green-500 text-white">Resolved</Badge>
+      <Badge className="bg-green-500 text-white hover:bg-green-400">Resolved</Badge>
     ) : (
       <Badge variant="destructive">Pending</Badge>
     );
@@ -592,8 +598,8 @@ const ViewTeacherClasses = () => {
         <hr className="my-1" />
 
         {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <p>Loading classes data...</p>
+          <div className="w-full flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -768,7 +774,7 @@ const ViewTeacherClasses = () => {
             >
               Cancel
             </Button>
-            <Button type="button" onClick={handleSaveUpdate}>
+            <Button type="button" onClick={handleSaveUpdate} disabled={isSubmitting}>
               Save Changes
             </Button>
           </DialogFooter>
@@ -821,7 +827,7 @@ const ViewTeacherClasses = () => {
             >
               Cancel
             </Button>
-            <Button type="button" onClick={handleResolveDispute}>
+            <Button type="button" onClick={handleResolveDispute} disabled={isDisputeSubmitting}>
               {disputeAction === "resolve" ? "Resolve" : "Reject"} Dispute
             </Button>
           </DialogFooter>

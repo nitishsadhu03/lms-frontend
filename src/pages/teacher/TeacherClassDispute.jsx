@@ -17,6 +17,7 @@ import {
   Search,
   X,
   AlertCircle,
+  Eye,
 } from "lucide-react";
 import {
   Dialog,
@@ -40,6 +41,9 @@ const TeacherClassDispute = () => {
   const [selectedClass, setSelectedClass] = useState(null);
   const [disputeReason, setDisputeReason] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
+  const [currentRemarks, setCurrentRemarks] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -131,9 +135,19 @@ const TeacherClassDispute = () => {
     setIsDisputeDialogOpen(false);
   };
 
+  const handleOpenRemarksDialog = (remarks) => {
+    setCurrentRemarks(remarks);
+    setIsRemarksDialogOpen(true);
+  };
+
+  const handleCloseRemarksDialog = () => {
+    setIsRemarksDialogOpen(false);
+  };
+
   // Handle raising a dispute
   const handleRaiseDispute = async () => {
     try {
+      setIsSubmitting(true);
       if (!selectedClass || !disputeReason) {
         toast({
           title: "Error",
@@ -206,6 +220,7 @@ const TeacherClassDispute = () => {
         variant: "destructive",
       });
     } finally {
+      setIsSubmitting(false);
       handleCloseDialog();
       fetchClasses();
     }
@@ -280,7 +295,11 @@ const TeacherClassDispute = () => {
     if (!dispute || !dispute.reason) return null;
 
     if (dispute.isResolved) {
-      return <Badge className="bg-green-500 text-white">Resolved</Badge>;
+      return (
+        <Badge className="bg-green-500 text-white hover:bg-green-400">
+          Resolved
+        </Badge>
+      );
     }
     return <Badge variant="destructive">Pending</Badge>;
   };
@@ -314,8 +333,8 @@ const TeacherClassDispute = () => {
         <hr className="my-4" />
 
         {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <p>Loading classes data...</p>
+          <div className="w-full flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -373,15 +392,28 @@ const TeacherClassDispute = () => {
                         {getDisputeStatusBadge(cls.dispute)}
                       </TableCell>
                       <TableCell>
-                        {(!cls.dispute || !cls.dispute.reason) && (
+                        {cls.dispute?.remarks ? (
                           <Button
                             variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDisputeDialog(cls)}
-                            className="hover:bg-gray-200 rounded-full"
+                            size="sm"
+                            onClick={() =>
+                              handleOpenRemarksDialog(cls.dispute.remarks)
+                            }
+                            className="text-blue-600 hover:text-blue-800 hover:bg-gray-200 rounded-full"
                           >
-                            <AlertCircle className="h-4 w-4 text-yellow-600" />
+                            <Eye className="h-5 w-5"/>
                           </Button>
+                        ) : (
+                          (!cls.dispute || !cls.dispute.reason) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDisputeDialog(cls)}
+                              className="hover:bg-gray-200 rounded-full"
+                            >
+                              <AlertCircle className="h-4 w-4 text-yellow-600" />
+                            </Button>
+                          )
                         )}
                       </TableCell>
                     </TableRow>
@@ -425,6 +457,29 @@ const TeacherClassDispute = () => {
         )}
       </div>
 
+      {/* Remarks Dialog */}
+      <Dialog
+        open={isRemarksDialogOpen}
+        onOpenChange={handleCloseRemarksDialog}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Dispute Remarks</DialogTitle>
+            <DialogDescription>
+              Admin response to your dispute
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 bg-gray-100 rounded-md">
+            <p className="text-sm">{currentRemarks}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={handleCloseRemarksDialog}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dispute Dialog */}
       <Dialog open={isDisputeDialogOpen} onOpenChange={handleCloseDialog}>
         <DialogContent className="sm:max-w-md">
@@ -458,7 +513,7 @@ const TeacherClassDispute = () => {
             <Button type="button" variant="outline" onClick={handleCloseDialog}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleRaiseDispute}>
+            <Button type="button" onClick={handleRaiseDispute} disabled={isSubmitting}>
               Submit Dispute
             </Button>
           </DialogFooter>

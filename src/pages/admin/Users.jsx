@@ -129,8 +129,8 @@ const Users = () => {
               </div>
 
               {isLoading ? (
-                <div className="flex justify-center items-center h-64">
-                  <p>Loading teachers data...</p>
+                <div className="w-full flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -256,8 +256,8 @@ const Users = () => {
               </div>
 
               {isLoading ? (
-                <div className="flex justify-center items-center h-64">
-                  <p>Loading students data...</p>
+                <div className="w-full flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
