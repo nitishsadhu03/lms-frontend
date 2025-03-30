@@ -13,7 +13,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Pen, Search, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+  AlertCircle,
+  Check,
+  Ban,
+  Pen,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,22 +40,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
 const backend_url = import.meta.env.VITE_API_URL;
 
 const ViewTeacherClasses = () => {
   const location = useLocation();
   const teacherData = location.state?.teacherData;
-  const { teacherId } = useParams(); // Get teacherId from URL
+  const { teacherId } = useParams();
   const [isLoading, setIsLoading] = useState(true);
   const [classes, setClasses] = useState([]);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDisputeDialogOpen, setIsDisputeDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
   const [type, setType] = useState("");
   const [penalty, setPenalty] = useState("");
   const [joinTime, setJoinTime] = useState("");
   const [amount, setAmount] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [disputeAction, setDisputeAction] = useState("resolve");
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,6 +69,7 @@ const ViewTeacherClasses = () => {
   // Filter state
   const [typeFilter, setTypeFilter] = useState("all");
   const [penaltyFilter, setPenaltyFilter] = useState("all");
+  const [disputeFilter, setDisputeFilter] = useState("all");
 
   // Filter options
   const typeOptions = ["paid", "cancelled", "rescheduled", "unsuccessful"];
@@ -70,7 +85,7 @@ const ViewTeacherClasses = () => {
     "Summary not filled",
   ];
 
-  // Function to get initials from name
+  // Get initials from name
   const getInitials = (name) => {
     if (!name) return "S";
     return name
@@ -81,90 +96,88 @@ const ViewTeacherClasses = () => {
       .substring(0, 2);
   };
 
-  // Process classes data to extract sessions, filter by teacherId, and filter by startDateTime
+  // Process classes data
   const processClassesData = (classes, teacherId) => {
-    const currentDateTime = new Date(); // Get current date and time
+    const currentDateTime = new Date();
 
     return classes
-      .filter((cls) => cls.teacherId?._id === teacherId) // Filter classes by teacherId
+      .filter((cls) => cls.teacherId?._id === teacherId)
       .flatMap((cls) => {
         if (cls.isRecurring) {
-          // For recurring classes, map each session to a row
           return cls.sessions
             .filter(
               (session) => new Date(session.startDateTime) <= currentDateTime
-            ) // Filter sessions that have started
+            )
             .map((session) => ({
               ...session,
               batchId: cls.batchId,
               classType: cls.classType,
-              adminUpdates: session.adminUpdates || cls.adminUpdates, // Use session-level adminUpdates if available, otherwise fallback to class-level
+              adminUpdates: session.adminUpdates || cls.adminUpdates,
+              dispute: session.dispute || cls.dispute,
               startDate: session.startDateTime
-                ? formatDate(session.startDateTime) // Format date
+                ? formatDate(session.startDateTime)
                 : "-",
               startTime: session.startDateTime
-                ? formatTime(session.startDateTime) // Format time
+                ? formatTime(session.startDateTime)
                 : "-",
-              startDateTime: session.startDateTime, // Keep original startDateTime for sorting
+              startDateTime: session.startDateTime,
             }));
         } else {
-          // For non-recurring classes, filter classes that have started
           if (new Date(cls.startDateTime) <= currentDateTime) {
             return {
               ...cls,
               startDate: cls.startDateTime
-                ? formatDate(cls.startDateTime) // Format date
+                ? formatDate(cls.startDateTime)
                 : "-",
               startTime: cls.startDateTime
-                ? formatTime(cls.startDateTime) // Format time
+                ? formatTime(cls.startDateTime)
                 : "-",
-              startDateTime: cls.startDateTime, // Keep original startDateTime for sorting
+              startDateTime: cls.startDateTime,
             };
           }
-          return null; // Skip classes that haven't started
+          return null;
         }
       })
-      .filter((cls) => cls !== null); // Remove null entries
+      .filter((cls) => cls !== null);
   };
 
-  // Function to format date as dd/mm/yyyy
+  // Format date as dd/mm/yyyy
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-based
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
 
-  // Function to format time as HH:MM AM/PM (12-hour format)
+  // Format time as HH:MM AM/PM
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     const hours = date.getHours();
     const minutes = String(date.getMinutes()).padStart(2, "0");
     const ampm = hours >= 12 ? "PM" : "AM";
-    const formattedHours = hours % 12 || 12; // Convert to 12-hour format
+    const formattedHours = hours % 12 || 12;
     return `${formattedHours}:${minutes} ${ampm}`;
   };
 
+  // Handle search
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
 
   const handleClearSearch = () => {
     setSearchQuery("");
-    setCurrentPage(1); // Reset to first page when clearing search
+    setCurrentPage(1);
   };
 
-  // Handle opening the update dialog
+  // Open admin updates dialog
   const handleOpenUpdateDialog = (cls) => {
     setSelectedClass(cls);
     setType(cls.adminUpdates?.type || "");
     setPenalty(cls.adminUpdates?.penalty || "");
-    // Convert UTC time to local time for the datetime-local input
     if (cls.adminUpdates?.joinTime) {
       const date = new Date(cls.adminUpdates.joinTime);
-      // Format to YYYY-MM-DDThh:mm format required by datetime-local input
       setJoinTime(
         date.toLocaleDateString("en-CA") +
           "T" +
@@ -177,12 +190,18 @@ const ViewTeacherClasses = () => {
     setIsUpdateDialogOpen(true);
   };
 
-  // Handle saving the session/class update
+  // Open dispute dialog
+  const handleOpenDisputeDialog = (cls) => {
+    setSelectedClass(cls);
+    setRemarks(cls.dispute?.remarks || "");
+    setIsDisputeDialogOpen(true);
+  };
+
+  // Save admin updates
   const handleSaveUpdate = async () => {
     try {
       if (!selectedClass) return;
 
-      // Prepare the payload
       const payload = {
         type,
         penalty,
@@ -190,24 +209,20 @@ const ViewTeacherClasses = () => {
         amount: parseFloat(amount),
       };
 
-      // Add sessionId or classId to the payload based on the type of class
       if (selectedClass.isRecurring === false) {
-        payload.classId = selectedClass._id; // Use session ID for recurring classes
+        payload.classId = selectedClass._id;
       } else {
         payload.sessionId = selectedClass._id;
       }
 
-      // Call the update API
       const response = await axiosInstance.post(
         `${backend_url}/admin/actions/update-by-admin`,
         payload
       );
 
-      if (response.data && response.data.success) {
-        // Update the local state
+      if (response.data?.success) {
         const updatedClasses = classes.map((cls) => {
           if (cls.isRecurring) {
-            // For recurring classes, update the specific session
             const updatedSessions = cls.sessions.map((session) => {
               if (session._id === selectedClass._id) {
                 return {
@@ -224,7 +239,6 @@ const ViewTeacherClasses = () => {
             });
             return { ...cls, sessions: updatedSessions };
           } else if (cls._id === selectedClass._id) {
-            // For single classes, update the class directly
             return {
               ...cls,
               adminUpdates: {
@@ -239,17 +253,13 @@ const ViewTeacherClasses = () => {
         });
 
         setClasses(updatedClasses);
+        toast({
+          title: "Success",
+          description: "Session/Class updated successfully",
+          variant: "success",
+        });
       }
-
-      toast({
-        title: "Success",
-        description: "Session/Class updated successfully",
-        variant: "success",
-      });
     } catch (error) {
-      // Log the error
-      console.error("Error:", error.response?.data || error.message);
-
       toast({
         title: "Error",
         description:
@@ -258,10 +268,91 @@ const ViewTeacherClasses = () => {
       });
     } finally {
       setIsUpdateDialogOpen(false);
-      fetchData(); // Refresh data after update
+      fetchData();
     }
   };
 
+  // Handle dispute resolution
+  const handleResolveDispute = async () => {
+    try {
+      if (!selectedClass || !remarks) {
+        toast({
+          title: "Error",
+          description: "Remarks are required",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const payload = {
+        remarks,
+        action: disputeAction,
+      };
+
+      if (selectedClass.isRecurring === false) {
+        payload.classId = selectedClass._id;
+      } else {
+        payload.sessionId = selectedClass._id;
+      }
+
+      const response = await axiosInstance.post(
+        `${backend_url}/admin/actions/resolve-dispute-by-admin`,
+        payload
+      );
+
+      if (response.data?.success) {
+        const updatedClasses = classes.map((cls) => {
+          if (cls.isRecurring) {
+            const updatedSessions = cls.sessions.map((session) => {
+              if (session._id === selectedClass._id) {
+                return {
+                  ...session,
+                  dispute: {
+                    ...session.dispute,
+                    isResolved: true,
+                    remarks,
+                  },
+                };
+              }
+              return session;
+            });
+            return { ...cls, sessions: updatedSessions };
+          } else if (cls._id === selectedClass._id) {
+            return {
+              ...cls,
+              dispute: {
+                ...cls.dispute,
+                isResolved: true,
+                remarks,
+              },
+            };
+          }
+          return cls;
+        });
+
+        setClasses(updatedClasses);
+        toast({
+          title: "Success",
+          description: `Dispute ${
+            disputeAction === "resolve" ? "resolved" : "rejected"
+          } successfully`,
+          variant: "success",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error.response?.data?.message || "Failed to resolve dispute",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDisputeDialogOpen(false);
+      fetchData();
+    }
+  };
+
+  // Fetch data
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -287,19 +378,20 @@ const ViewTeacherClasses = () => {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [typeFilter, penaltyFilter]);
+  }, [typeFilter, penaltyFilter, disputeFilter]);
 
+  // Filter classes
   const filteredClasses = processClassesData(classes, teacherId)
     .sort((a, b) => new Date(b.startDateTime) - new Date(a.startDateTime))
     .filter((cls) => {
-      // Apply search filter
+      // Search filter
       if (searchQuery && cls.batchId) {
         if (!cls.batchId.toLowerCase().includes(searchQuery.toLowerCase())) {
           return false;
         }
       }
 
-      // Apply type filter if selected
+      // Type filter
       if (
         typeFilter &&
         typeFilter !== "all" &&
@@ -308,7 +400,7 @@ const ViewTeacherClasses = () => {
         return false;
       }
 
-      // Apply penalty filter if selected
+      // Penalty filter
       if (
         penaltyFilter &&
         penaltyFilter !== "all" &&
@@ -317,10 +409,24 @@ const ViewTeacherClasses = () => {
         return false;
       }
 
+      // Dispute filter
+      if (
+        disputeFilter === "pending" &&
+        (!cls.dispute?.reason || cls.dispute?.isResolved)
+      ) {
+        return false;
+      }
+      if (
+        disputeFilter === "resolved" &&
+        (!cls.dispute?.reason || !cls.dispute?.isResolved)
+      ) {
+        return false;
+      }
+
       return true;
     });
 
-  // Calculate pagination
+  // Pagination
   const totalPages = Math.ceil(filteredClasses.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
@@ -348,10 +454,25 @@ const ViewTeacherClasses = () => {
     setPenaltyFilter(value);
   };
 
+  const handleDisputeFilterChange = (value) => {
+    setDisputeFilter(value);
+  };
+
   // Clear all filters
   const clearFilters = () => {
     setTypeFilter("all");
     setPenaltyFilter("all");
+    setDisputeFilter("all");
+  };
+
+  // Get dispute badge
+  const getDisputeBadge = (dispute) => {
+    if (!dispute?.reason) return null;
+    return dispute.isResolved ? (
+      <Badge className="bg-green-500 text-white">Resolved</Badge>
+    ) : (
+      <Badge variant="destructive">Pending</Badge>
+    );
   };
 
   return (
@@ -407,9 +528,9 @@ const ViewTeacherClasses = () => {
             </div>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="typeFilter">Filter by Type</Label>
+            <Label htmlFor="typeFilter">Type</Label>
             <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
@@ -423,12 +544,12 @@ const ViewTeacherClasses = () => {
             </Select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="penaltyFilter">Filter by Penalty</Label>
+            <Label htmlFor="penaltyFilter">Penalty</Label>
             <Select
               value={penaltyFilter}
               onValueChange={handlePenaltyFilterChange}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="All penalties" />
               </SelectTrigger>
               <SelectContent>
@@ -441,7 +562,25 @@ const ViewTeacherClasses = () => {
               </SelectContent>
             </Select>
           </div>
-          {(typeFilter || penaltyFilter) && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="disputeFilter">Dispute</Label>
+            <Select
+              value={disputeFilter}
+              onValueChange={handleDisputeFilterChange}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="All disputes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All disputes</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {(typeFilter !== "all" ||
+            penaltyFilter !== "all" ||
+            disputeFilter !== "all") && (
             <div className="flex items-end">
               <Button variant="outline" onClick={clearFilters}>
                 Clear Filters
@@ -467,8 +606,8 @@ const ViewTeacherClasses = () => {
                   <TableHead>Batch ID</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Penalty</TableHead>
-                  <TableHead>Amount (in rupees)</TableHead>
-                  <TableHead>Join Time</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Dispute</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -500,20 +639,28 @@ const ViewTeacherClasses = () => {
                         {cls.adminUpdates?.penalty || "-"}
                       </TableCell>
                       <TableCell>{cls.adminUpdates?.amount || "-"}</TableCell>
+                      <TableCell>{getDisputeBadge(cls.dispute)}</TableCell>
                       <TableCell>
-                        {cls.adminUpdates?.joinTime
-                          ? formatTime(cls.adminUpdates.joinTime)
-                          : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenUpdateDialog(cls)}
-                          className="hover:bg-gray-200 rounded-full"
-                        >
-                          <Pen className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenUpdateDialog(cls)}
+                            className="hover:bg-gray-200 rounded-full"
+                          >
+                            <Pen className="h-4 w-4" />
+                          </Button>
+                          {cls.dispute?.reason && !cls.dispute?.isResolved && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenDisputeDialog(cls)}
+                              className="hover:bg-gray-200 rounded-full"
+                            >
+                              <AlertCircle className="h-4 w-4 text-yellow-600" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -556,7 +703,7 @@ const ViewTeacherClasses = () => {
         )}
       </div>
 
-      {/* Update Dialog */}
+      {/* Admin Updates Dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -588,27 +735,11 @@ const ViewTeacherClasses = () => {
                   <SelectValue placeholder="Select penalty" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="No show">No show</SelectItem>
-                  <SelectItem value="Video Duration (<40min)">
-                    Video Duration (&lt;40min)
-                  </SelectItem>
-                  <SelectItem value="Cancellation (<120min)">
-                    Cancellation (&lt;120min)
-                  </SelectItem>
-                  <SelectItem value="1-7 class cancellation">
-                    1-7 class cancellation
-                  </SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                  <SelectItem value="Class Duration (<55min)">
-                    Class Duration (&lt;55min)
-                  </SelectItem>
-                  <SelectItem value="Delayed Partial">
-                    Delayed Partial
-                  </SelectItem>
-                  <SelectItem value="Delayed Full">Delayed Full</SelectItem>
-                  <SelectItem value="Summary not filled">
-                    Summary not filled
-                  </SelectItem>
+                  {penaltyOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -639,6 +770,59 @@ const ViewTeacherClasses = () => {
             </Button>
             <Button type="button" onClick={handleSaveUpdate}>
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dispute Resolution Dialog */}
+      <Dialog open={isDisputeDialogOpen} onOpenChange={setIsDisputeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Resolve Dispute</DialogTitle>
+            <DialogDescription>
+              Review and resolve the teacher&apos;s dispute for this
+              session/class.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="p-4 bg-gray-100 rounded-md">
+              <h4 className="font-medium mb-2">Teacher&apos;s Dispute:</h4>
+              <p className="text-sm">{selectedClass?.dispute?.reason}</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="action">Action</Label>
+              <Select value={disputeAction} onValueChange={setDisputeAction}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="resolve">Resolve</SelectItem>
+                  <SelectItem value="reject">Reject</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="remarks">Remarks</Label>
+              <Textarea
+                id="remarks"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Enter your remarks..."
+                className="min-h-32"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDisputeDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleResolveDispute}>
+              {disputeAction === "resolve" ? "Resolve" : "Reject"} Dispute
             </Button>
           </DialogFooter>
         </DialogContent>

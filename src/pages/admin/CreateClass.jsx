@@ -47,6 +47,7 @@ const CreateClass = () => {
   const [classToReschedule, setClassToReschedule] = useState(null);
   const [newStartDateTime, setNewStartDateTime] = useState("");
   const [newEndDateTime, setNewEndDateTime] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const navigate = useNavigate();
 
@@ -96,6 +97,7 @@ const CreateClass = () => {
 
   const fetchClasses = async () => {
     try {
+      setIsLoading(true);
       const response = await axiosInstance.get(
         `${backend_url}/profile/classes/admin`
       );
@@ -108,6 +110,8 @@ const CreateClass = () => {
         description: "Failed to fetch class data",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -270,120 +274,129 @@ const CreateClass = () => {
           </div>
         </div>
         <hr className="my-4" />
-
-        {filteredClasses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-8">
-            <div className="text-gray-500">
-              No classes found matching &quot;{searchQuery}&quot;
-            </div>
+        {isLoading ? (
+          <div className="w-full flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 my-6">
-            {filteredClasses.map((classData) => (
-              <Card
-                key={classData._id}
-                className="w-full shadow-lg flex flex-col h-[220px]"
-              >
-                <CardHeader className="pb-1 shrink-0">
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg font-semibold text-gray-900 line-clamp-2">
-                      {classData.batchId}
-                    </CardTitle>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 shrink-0"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-40 p-0">
-                        <div className="flex flex-col">
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start rounded-none text-red-500 hover:bg-gray-100 hover:text-red-500"
-                            onClick={() => handleDeleteClick(classData)}
-                          >
-                            Delete
-                          </Button>
-                          {!classData.isRecurring && (
+          <div>
+            {filteredClasses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8">
+                <div className="text-gray-500">
+                  No classes found matching &quot;{searchQuery}&quot;
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 my-6">
+                {filteredClasses.map((classData) => (
+                  <Card
+                    key={classData._id}
+                    className="w-full shadow-lg flex flex-col h-[220px]"
+                  >
+                    <CardHeader className="pb-1 shrink-0">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="text-lg font-semibold text-gray-900 line-clamp-2">
+                          {classData.batchId}
+                        </CardTitle>
+                        <Popover>
+                          <PopoverTrigger asChild>
                             <Button
                               variant="ghost"
-                              className="w-full justify-start rounded-none text-blue-500 hover:bg-gray-100 hover:text-blue-500"
-                              onClick={() => handleRescheduleClick(classData)}
+                              size="sm"
+                              className="h-8 w-8 p-0 shrink-0"
                             >
-                              Reschedule
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </CardHeader>
-                <CardContent className="pb-2 flex-grow">
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <span
-                      className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                        classData.isRecurring
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {classData.isRecurring ? "Recurring" : "Single"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>
-                        {classData.isRecurring
-                          ? `Start Date: ${formatDate(classData.startDate)}`
-                          : `Start: ${formatDate(
-                              classData.startDateTime
-                            )} at ${formatTime(classData.startDateTime)}`}
-                      </span>
-                    </div>
-                    {classData.isRecurring && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>Sessions: {classData.sessions.length}</span>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-40 p-0">
+                            <div className="flex flex-col">
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start rounded-none text-red-500 hover:bg-gray-100 hover:text-red-500"
+                                onClick={() => handleDeleteClick(classData)}
+                              >
+                                Delete
+                              </Button>
+                              {!classData.isRecurring && (
+                                <Button
+                                  variant="ghost"
+                                  className="w-full justify-start rounded-none text-blue-500 hover:bg-gray-100 hover:text-blue-500"
+                                  onClick={() =>
+                                    handleRescheduleClick(classData)
+                                  }
+                                >
+                                  Reschedule
+                                </Button>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter className="mt-auto pt-0 shrink-0">
-                  {!classData.isRecurring ? (
-                    <a
-                      href={
-                        classData.classLink.startsWith("http")
-                          ? classData.classLink
-                          : `https://${classData.classLink}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full"
-                    >
-                      <Button className="w-full bg-primary hover:bg-primary/85">
-                        Join Class
-                      </Button>
-                    </a>
-                  ) : (
-                    <Link
-                      to={`/fcc_admin/class/${classData._id}`}
-                      state={{ classData }}
-                      className="w-full"
-                    >
-                      <Button className="w-full bg-primary hover:bg-primary/85">
-                        View Details
-                      </Button>
-                    </Link>
-                  )}
-                </CardFooter>
-              </Card>
-            ))}
+                    </CardHeader>
+                    <CardContent className="pb-2 flex-grow">
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <span
+                          className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
+                            classData.isRecurring
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {classData.isRecurring ? "Recurring" : "Single"}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            {classData.isRecurring
+                              ? `Start Date: ${formatDate(classData.startDate)}`
+                              : `Start: ${formatDate(
+                                  classData.startDateTime
+                                )} at ${formatTime(classData.startDateTime)}`}
+                          </span>
+                        </div>
+                        {classData.isRecurring && (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>Sessions: {classData.sessions.length}</span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                    <CardFooter className="mt-auto pt-0 shrink-0">
+                      {!classData.isRecurring ? (
+                        <a
+                          href={
+                            classData.classLink.startsWith("http")
+                              ? classData.classLink
+                              : `https://${classData.classLink}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full"
+                        >
+                          <Button className="w-full bg-primary hover:bg-primary/85">
+                            Join Class
+                          </Button>
+                        </a>
+                      ) : (
+                        <Link
+                          to={`/fcc_admin/class/${classData._id}`}
+                          state={{ classData }}
+                          className="w-full"
+                        >
+                          <Button className="w-full bg-primary hover:bg-primary/85">
+                            View Details
+                          </Button>
+                        </Link>
+                      )}
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

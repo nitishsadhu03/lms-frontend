@@ -12,6 +12,7 @@ import {
   Image,
   Loader2,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -31,6 +32,7 @@ import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
+import { Input } from "@/components/ui/input";
 
 const backend_url = import.meta.env.VITE_API_URL;
 
@@ -49,6 +51,7 @@ const Dashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState(null);
+  const [link, setLink] = useState("");
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -163,6 +166,7 @@ const Dashboard = () => {
       // Send image as base64 string directly
       await axiosInstance.post(`${backend_url}/admin/actions/announcement`, {
         image: previewUrl, // Sending the base64 string directly
+        link: link || null,
       });
 
       toast({
@@ -177,6 +181,7 @@ const Dashboard = () => {
       // Reset form state
       setSelectedImage(null);
       setPreviewUrl(null);
+      setLink("");
       setIsModalOpen(false);
     } catch (error) {
       console.error("Error creating announcement:", error);
@@ -443,6 +448,21 @@ const Dashboard = () => {
                       )}
                     </div>
                   </div>
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium">
+                      Link (optional)
+                    </label>
+                    <Input
+                      type="url"
+                      placeholder="https://example.com"
+                      value={link}
+                      onChange={(e) => setLink(e.target.value)}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Add a URL that users will be directed to when clicking the
+                      announcement
+                    </p>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-3">
                   <DialogClose asChild>
@@ -534,7 +554,27 @@ const Dashboard = () => {
                       alt="Announcement"
                       className="w-full h-full object-contain rounded-lg"
                     />
-                    <div className="absolute bottom-4 right-4">
+                    <div className="absolute bottom-4 right-4 flex gap-2">
+                      {announcement.link && (
+                        <a
+                          href={
+                            announcement.link.startsWith("http")
+                              ? announcement.link
+                              : `https://${announcement.link}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1 bg-white/90 hover:bg-gray-100"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="hidden sm:inline">View</span>
+                          </Button>
+                        </a>
+                      )}
                       <Button
                         variant="destructive"
                         size="sm"

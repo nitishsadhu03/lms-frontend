@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import axiosInstance from "@/services/axios";
-import { Layers, SquarePlus, Upload } from "lucide-react";
+import { Layers, Loader2, SquarePlus, Upload } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 const backend_url = import.meta.env.VITE_API_URL;
@@ -36,6 +36,7 @@ const Payment = () => {
     receiptImage: null,
   });
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchTeachers = async () => {
     try {
@@ -69,8 +70,10 @@ const Payment = () => {
 
   const fetchPayments = async () => {
     try {
-      const response = await axiosInstance.get(`${backend_url}/profile/payments`);
-      console.log("payments: ", response.data.payments)
+      const response = await axiosInstance.get(
+        `${backend_url}/profile/payments`
+      );
+      console.log("payments: ", response.data.payments);
     } catch (error) {
       toast({
         title: "Error",
@@ -137,6 +140,7 @@ const Payment = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
 
     try {
       // Validate required fields
@@ -180,6 +184,8 @@ const Payment = () => {
           error.response?.data?.message || "Failed to upload payment receipt",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -330,8 +336,16 @@ const Payment = () => {
               <Button
                 className="bg-primary hover:bg-primary/85"
                 onClick={handleSubmit}
+                disabled={isLoading}
               >
-                Upload Receipt
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </div>
+                ) : (
+                  "Upload Receipt"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -10,6 +10,7 @@ import {
   Shield,
   UserPlus,
   Edit,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,9 @@ const Home = () => {
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [teacherModalOpen, setTeacherModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [isCreatingStudent, setIsCreatingStudent] = useState(false);
+  const [isCreatingTeacher, setIsCreatingTeacher] = useState(false);
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   const [studentForm, setStudentForm] = useState({
     studentId: "",
@@ -188,6 +192,9 @@ const Home = () => {
 
   const handleSubmit = async (formData, type) => {
     try {
+      if (type === "student") setIsCreatingStudent(true);
+      if (type === "teacher") setIsCreatingTeacher(true);
+      if (type === "admin") setIsCreatingAdmin(true);
       let payload;
       switch (type) {
         case "student":
@@ -316,6 +323,11 @@ const Home = () => {
         description: error.response?.data?.message || "Failed to create user",
         variant: "destructive",
       });
+    } finally {
+      // Reset all loading states
+      setIsCreatingStudent(false);
+      setIsCreatingTeacher(false);
+      setIsCreatingAdmin(false);
     }
   };
 
@@ -520,8 +532,24 @@ const Home = () => {
         </div>
 
         <DialogFooter>
-          <Button onClick={() => handleSubmit(form, type)}>
-            Create {type}
+          <Button
+            onClick={() => handleSubmit(form, type)}
+            disabled={
+              (type === "student" && isCreatingStudent) ||
+              (type === "teacher" && isCreatingTeacher) ||
+              (type === "admin" && isCreatingAdmin)
+            }
+          >
+            {(type === "student" && isCreatingStudent) ||
+            (type === "teacher" && isCreatingTeacher) ||
+            (type === "admin" && isCreatingAdmin) ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creating...
+              </div>
+            ) : (
+              `Create ${type}`
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -8,9 +8,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import axiosInstance from "@/services/axios";
-import { Eye, FileText } from "lucide-react";
+import { Eye, FileText, Image } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
@@ -109,23 +115,35 @@ const StudentResources = () => {
                   className="shadow-md hover:shadow-lg transition-shadow"
                 >
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FileText className="text-blue-500" size={24} />
-                        <h3 className="font-medium">{resource.title}</h3>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Link
-                          to={resource.lessonPlan}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                        >
-                          <Eye
-                            className="text-gray-600 hover:text-primary"
-                            size={20}
-                          />
-                        </Link>
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <FileText className="text-blue-500" size={24} />
+                          <h3 className="font-medium">{resource.title}</h3>
+                        </div>
+                        <div className="flex items-center justify-start gap-3 mt-2">
+                          {/* Visual Aid Link - Only show if available */}
+                          {resource.visualAid && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    to={resource.visualAid}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors"
+                                  >
+                                    <Image size={16} />
+                                    <span className="text-sm">Visual Aid</span>
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>View visual aid</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardContent>

@@ -30,7 +30,14 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import axiosInstance from "@/services/axios";
-import { SquarePlus, Trash2, Video, Filter, Calendar } from "lucide-react";
+import {
+  SquarePlus,
+  Trash2,
+  Video,
+  Filter,
+  Calendar,
+  Loader2,
+} from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 const backend_url = import.meta.env.VITE_API_URL;
@@ -54,6 +61,7 @@ const ClassRecording = () => {
   const [courses, setCourses] = useState([]);
   const [recordingCourses, setRecordingCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState("all");
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchTeachers = async () => {
     try {
@@ -188,6 +196,7 @@ const ClassRecording = () => {
   };
 
   const handleSubmit = async () => {
+    setIsLoading(true);
     try {
       const validatedLink = formData.videoLink.startsWith("http")
         ? formData.videoLink
@@ -229,6 +238,8 @@ const ClassRecording = () => {
         description: error.response?.data?.message || "Recording upload failed",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -435,8 +446,16 @@ const ClassRecording = () => {
               <Button
                 className="bg-primary hover:bg-primary/85"
                 onClick={handleSubmit}
+                disabled={isLoading}
               >
-                Upload Recording
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </div>
+                ) : (
+                  "Upload Recording"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

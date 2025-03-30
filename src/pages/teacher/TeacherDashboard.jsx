@@ -11,6 +11,7 @@ import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
+import { Button } from "@/components/ui/button";
 
 const backend_url = import.meta.env.VITE_API_URL;
 
@@ -260,6 +261,28 @@ const TeacherDashboard = () => {
                       alt="Announcement"
                       className="w-full h-full object-contain rounded-lg"
                     />
+                    <div className="absolute bottom-4 right-4 flex gap-2">
+                      {announcement.link && (
+                        <a
+                          href={
+                            announcement.link.startsWith("http")
+                              ? announcement.link
+                              : `https://${announcement.link}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1 bg-white/90 hover:bg-gray-100"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="hidden sm:inline">View</span>
+                          </Button>
+                        </a>
+                      )}
+                    </div>
                     <div className="absolute bottom-4 left-4 bg-black/50 px-3 py-1 rounded text-white text-xs">
                       Posted: {formatDate(announcement.createdAt)}
                     </div>

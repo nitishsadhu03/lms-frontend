@@ -34,43 +34,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import axios from "axios";
 import axiosInstance from "@/services/axios";
-
-const courseNames = ["python", "java", "javascript", "c++", "go"];
-
-const resourcesData = [
-  {
-    title: "Introduction to Python",
-    course: "python",
-    link: "https://example.com/python-introduction",
-  },
-  {
-    title: "Advanced Python",
-    course: "python",
-    link: "https://example.com/python-introduction",
-  },
-  {
-    title: "Advanced Java Programming",
-    course: "java",
-    link: "https://example.com/advanced-java",
-  },
-  {
-    title: "JavaScript Basics",
-    course: "javascript",
-    link: "https://example.com/javascript-basics",
-  },
-  {
-    title: "C++ for Beginners",
-    course: "c++",
-    link: "https://example.com/cplusplus-beginners",
-  },
-  {
-    title: "Go Language Fundamentals",
-    course: "go",
-    link: "https://example.com/go-fundamentals",
-  },
-];
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const BACKEND_URL = import.meta.env.VITE_API_URL;
 
@@ -182,6 +154,12 @@ const Resources = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState(null);
+  const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [editCourseData, setEditCourseData] = useState({
+    name: "",
+    numberOfSessions: "",
+  });
 
   const fectchResources = async () => {
     try {
@@ -468,7 +446,7 @@ const Resources = () => {
     try {
       setIsLoading(true);
       const response = await axiosInstance.post(
-        "/admin/actions/create-course",
+        `${BACKEND_URL}/admin/actions/create-course`,
         {
           name: newCourseData.name,
           numberOfSessions: parseInt(newCourseData.sessions),
@@ -481,7 +459,7 @@ const Resources = () => {
         description: "Course created successfully",
       });
 
-      courseNames.push(newCourseData.name.toLowerCase());
+      // courseNames.push(newCourseData.name.toLowerCase());
 
       setNewCourseData({ name: "", sessions: "" });
       setIsCourseModalOpen(false);
@@ -495,6 +473,55 @@ const Resources = () => {
     } finally {
       setIsLoading(false);
       window.location.reload();
+    }
+  };
+
+  const handleEditCourse = (course) => {
+    setSelectedCourse(course);
+    setEditCourseData({
+      name: course.name,
+      numberOfSessions: course.numberOfSessions.toString(),
+    });
+    setIsEditCourseModalOpen(true);
+  };
+
+  const handleEditCourseInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditCourseData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleEditCourseSubmit = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axiosInstance.put(
+        `${BACKEND_URL}/admin/actions/edit-course/${selectedCourse._id}`,
+        {
+          name: editCourseData.name,
+          numberOfSessions: parseInt(editCourseData.numberOfSessions),
+        }
+      );
+
+      toast({
+        variant: "success",
+        title: "Success",
+        description: "Course updated successfully",
+      });
+
+      // Refresh the courses list
+      await fetchCourses();
+      setIsEditCourseModalOpen(false);
+    } catch (error) {
+      console.error("Error updating course:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update course",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -778,6 +805,80 @@ const Resources = () => {
             </div>
           )}
         </div>
+        <hr className="my-6" />
+        <div className="mt-12">
+          <h1 className="text-lg font-medium">All Courses</h1>
+          <hr className="mt-2 mb-4" />
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">S.No.</TableHead>
+                  <TableHead>Course Name</TableHead>
+                  <TableHead>Number of Sessions</TableHead>
+                  <TableHead className="text-right">Edit Course</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {courses.map((course, index) => (
+                  <TableRow key={course._id}>
+                    <TableCell className="font-medium">{index + 1}</TableCell>
+                    <TableCell>{course.name}</TableCell>
+                    <TableCell>{course.numberOfSessions}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="icon"
+                          className="rounded-full bg-transparent hover:bg-gray-200 text-primary"
+                          onClick={() => handleEditCourse(course)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        <Dialog
+          open={isEditCourseModalOpen}
+          onOpenChange={setIsEditCourseModalOpen}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Course</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Course Name</Label>
+                <Input
+                  id="edit-name"
+                  name="name"
+                  value={editCourseData.name}
+                  onChange={handleEditCourseInputChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-sessions">Number of Sessions</Label>
+                <Input
+                  id="edit-sessions"
+                  name="numberOfSessions"
+                  type="number"
+                  value={editCourseData.numberOfSessions}
+                  onChange={handleEditCourseInputChange}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleEditCourseSubmit} disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ import {
   BookOpen,
   Eye,
   Filter,
+  Loader2,
   MoreVertical,
   NotebookPen,
   Pencil,
@@ -51,6 +52,8 @@ const HomeworkForm = ({
   setIsCreateModalOpen,
   setIsEditModalOpen,
   resetForm,
+  isCreating,
+  isEditing,
 }) => {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -146,7 +149,18 @@ const HomeworkForm = ({
         >
           Cancel
         </Button>
-        <Button type="submit">{selectedHomework ? "Save" : "Create"}</Button>
+        <Button type="submit" disabled={isCreating || isEditing}>
+          {isCreating || isEditing ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {selectedHomework ? "Saving..." : "Creating..."}
+            </div>
+          ) : selectedHomework ? (
+            "Save"
+          ) : (
+            "Create"
+          )}
+        </Button>
       </div>
     </form>
   );
@@ -171,6 +185,10 @@ const CreateHomework = () => {
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
   const [homeworkCourses, setHomeworkCourses] = useState([]);
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchCourses = async () => {
     try {
@@ -290,6 +308,7 @@ const CreateHomework = () => {
   };
 
   const handleDelete = async () => {
+    setIsDeleting(true);
     try {
       await axiosInstance.delete(
         `${backend_url}/admin/actions/delete-homework/${selectedHomework._id}`
@@ -315,11 +334,14 @@ const CreateHomework = () => {
           error.response?.data?.message || "Failed to delete homework",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       const validatedLink = formData.homeworkLink.startsWith("http")
         ? formData.homeworkLink
@@ -354,11 +376,14 @@ const CreateHomework = () => {
           error.response?.data?.message || "Assignment creation failed",
         variant: "destructive",
       });
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+    setIsEditing(true);
     try {
       const validatedLink = formData.homeworkLink.startsWith("http")
         ? formData.homeworkLink
@@ -413,6 +438,8 @@ const CreateHomework = () => {
           error.response?.data?.message || "Failed to update assignment",
         variant: "destructive",
       });
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -467,6 +494,8 @@ const CreateHomework = () => {
               setIsCreateModalOpen={setIsCreateModalOpen}
               setIsEditModalOpen={setIsEditModalOpen}
               resetForm={resetForm}
+              isCreating={isCreating}
+              isEditing={isEditing}
             />
           </DialogContent>
         </Dialog>
@@ -488,6 +517,8 @@ const CreateHomework = () => {
               setIsCreateModalOpen={setIsCreateModalOpen}
               setIsEditModalOpen={setIsEditModalOpen}
               resetForm={resetForm}
+              isCreating={isCreating}
+              isEditing={isEditing}
             />
           </DialogContent>
         </Dialog>
@@ -512,8 +543,19 @@ const CreateHomework = () => {
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDelete}>
-                Delete
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </div>
+                ) : (
+                  "Delete"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

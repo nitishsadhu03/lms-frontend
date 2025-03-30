@@ -49,7 +49,30 @@ const Timetables = () => {
             axiosInstance.get(`${backend_url}/api/teacher/all`),
           ]);
 
-        setClasses(classesResponse.data.classes || []);
+        const formattedClasses = classesResponse.data.classes
+          .map((cls) => {
+            // For recurring classes, use the sessions array
+            if (cls.isRecurring && cls.sessions) {
+              return cls.sessions.map((session) => ({
+                ...session,
+                batchId: cls.batchId,
+                classLink: cls.classLink,
+                teacherId: cls.teacherId,
+                isRecurring: true,
+                students: cls.studentIds,
+              }));
+            }
+            // For single classes
+            return {
+              ...cls,
+              startDateTime: cls.startDateTime || cls.startDate,
+              endDateTime: cls.endDateTime || cls.endDate,
+              students: cls.studentIds,
+            };
+          })
+          .flat(); // Flatten the array
+
+        setClasses(formattedClasses);
         setAvailabilities(availabilitiesResponse.data.data || []);
         console.log("schedule", scheduleResponse.data.data);
         if (scheduleResponse.data.data && teacherId) {
@@ -86,6 +109,7 @@ const Timetables = () => {
 
       setFilteredClasses(teacherClasses);
       setFilteredAvailabilities(teacherAvailabilities);
+      console.log("class", filteredClasses);
     }
   }, [teacherId, classes, availabilities]);
 
@@ -99,12 +123,21 @@ const Timetables = () => {
   };
 
   const getClassesForDate = (day) => {
+    const targetDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day
+    );
+
     return filteredClasses.filter((cls) => {
-      const classDate = new Date(cls.startDateTime || cls.startDate);
+      if (!cls.startDateTime) return false;
+
+      const classDate = new Date(cls.startDateTime);
+
       return (
-        classDate.getFullYear() === currentDate.getFullYear() &&
-        classDate.getMonth() === currentDate.getMonth() &&
-        classDate.getDate() === day
+        classDate.getFullYear() === targetDate.getFullYear() &&
+        classDate.getMonth() === targetDate.getMonth() &&
+        classDate.getDate() === targetDate.getDate()
       );
     });
   };
@@ -127,11 +160,17 @@ const Timetables = () => {
   };
 
   const formatTime = (cls) => {
-    if (!cls) return "N/A";
-    const timeToFormat = cls.startDateTime || cls.startDate || cls.endDate;
-    if (!timeToFormat) return "N/A";
-    const date = new Date(timeToFormat);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (!cls.startDateTime) return "N/A";
+
+    // Create date object from the ISO string
+    const date = new Date(cls.startDateTime);
+
+    // Format in user's local timezone
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   const formatDate = (dateTimeString) => {
@@ -149,11 +188,12 @@ const Timetables = () => {
 
   const handleMouseEnter = (day, event) => {
     const classes = getClassesForDate(day);
+    const availability = getAvailabilityForDate(day);
 
-    if (classes.length > 0) {
+    if (classes.length > 0 || availability) {
       const rect = event.currentTarget.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
-      const popupHeight = 300; // Adjusted height based on content
+      const popupHeight = classes.length > 0 && availability ? 400 : 300;
 
       const leftOffset = rect.left + window.scrollX;
       const xPos =
@@ -166,7 +206,7 @@ const Timetables = () => {
       setHoverInfo({
         visible: true,
         classes: classes,
-        availability: null, // No availability in hover popup
+        availability: availability,
         day: day,
         position: { x: xPos, y: Math.max(0, yPos) },
       });
@@ -175,6 +215,17 @@ const Timetables = () => {
 
   const handleMouseLeave = () => {
     setHoverInfo((prev) => ({ ...prev, visible: false }));
+  };
+
+  const filterUpcomingAvailabilitySlots = (slots) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+
+    return slots.filter((slot) => {
+      const slotDate = new Date(slot.date);
+      slotDate.setHours(0, 0, 0, 0); // Set to start of day
+      return slotDate >= today;
+    });
   };
 
   const renderCalendar = () => {
@@ -198,13 +249,14 @@ const Timetables = () => {
       const hasClasses = dayClasses.length > 0;
       const classCount = dayClasses.length;
       const isSelected = hoverInfo.visible && hoverInfo.day === day;
+      const isAvailable = getAvailabilityForDate(day);
 
       days.push(
         <div
           key={day}
           className={`min-h-[60px] sm:min-h-[80px] md:min-h-[100px] border p-1 sm:p-2 relative cursor-pointer transition-colors
-            ${hasClasses ? "bg-gray-100" : "hover:bg-gray-50"}
-            ${isSelected ? "ring-2 ring-blue-500 z-10" : ""}`}
+        ${hasClasses ? "bg-gray-100" : "hover:bg-gray-50"}
+        ${isSelected ? "ring-2 ring-blue-500 z-10" : ""}`}
           onClick={() => {
             if (hasClasses) {
               setShowErrorDialog(true);
@@ -220,11 +272,18 @@ const Timetables = () => {
             {hasClasses && (
               <div
                 className={`p-1 rounded-full text-center ${
-                  isSelected ? "bg-blue-600" : "bg-green-500"
+                  isSelected ? "bg-green-600" : "bg-green-500"
                 } hover:bg-green-600 transition-colors`}
               >
                 <span className="text-[7.5px] sm:text-xs md:text-sm text-white lg:font-medium block">
                   {classCount > 1 ? `${classCount} Classes` : "1 Class"}
+                </span>
+              </div>
+            )}
+            {isAvailable && (
+              <div className="p-1 rounded-full text-center bg-blue-500 hover:bg-blue-600 transition-colors">
+                <span className="text-[7.5px] sm:text-xs md:text-sm text-white lg:font-medium block">
+                  Available
                 </span>
               </div>
             )}
@@ -268,7 +327,9 @@ const Timetables = () => {
                   src={teacherData.profileImage}
                   alt={teacherData.name}
                 />
-                <AvatarFallback className="text-black font-medium">{getInitials(teacherData.name)}</AvatarFallback>
+                <AvatarFallback className="text-black font-medium">
+                  {getInitials(teacherData.name)}
+                </AvatarFallback>
               </Avatar>
               <div>
                 <p className="font-medium">{teacherData.name}</p>
@@ -372,13 +433,16 @@ const Timetables = () => {
                 </h3>
                 <hr className="my-3" />
 
-                {filteredAvailabilities.length === 0 ? (
+                {filterUpcomingAvailabilitySlots(filteredAvailabilities)
+                  .length === 0 ? (
                   <div className="p-4 bg-gray-50 rounded-md border border-gray-200 text-center">
                     <p className="text-gray-600">No availability slots set.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {filteredAvailabilities.map((slot, index) => (
+                    {filterUpcomingAvailabilitySlots(
+                      filteredAvailabilities
+                    ).map((slot, index) => (
                       <div
                         key={index}
                         className="p-3 sm:p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
@@ -415,7 +479,7 @@ const Timetables = () => {
                   style={{
                     left: `${hoverInfo.position.x}px`,
                     top: `${hoverInfo.position.y}px`,
-                    maxHeight: "300px",
+                    maxHeight: "400px",
                     overflowY: "auto",
                     opacity: hoverInfo.visible ? 1 : 0,
                     pointerEvents: hoverInfo.visible ? "auto" : "none",
@@ -426,87 +490,87 @@ const Timetables = () => {
                   onMouseLeave={handleMouseLeave}
                 >
                   <h4 className="text-sm font-semibold mb-2">
-                    {hoverInfo.classes.length > 0
-                      ? `Classes on ${formatDate(
-                          hoverInfo.classes[0]?.startDateTime
-                        )}`
-                      : hoverInfo.availability
-                      ? `Available on ${formatDate(
-                          hoverInfo.availability.date
-                        )}`
-                      : `Day ${hoverInfo.day}`}
+                    {new Date(
+                      currentDate.getFullYear(),
+                      currentDate.getMonth(),
+                      hoverInfo.day
+                    ).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </h4>
-                  <div className="space-y-3">
-                    {hoverInfo.availability &&
-                      hoverInfo.classes.length === 0 && (
-                        <div className="p-2 border rounded-md bg-blue-50 hover:bg-blue-100 transition-colors">
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium text-sm">
-                              Available
-                            </span>
-                          </div>
-                          <div className="text-xs mt-1">
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-blue-500" />
-                              <span>
-                                From: {hoverInfo.availability.startTime}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 mt-1">
-                              <Clock className="h-3 w-3 text-blue-500" />
-                              <span>To: {hoverInfo.availability.endTime}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
-                    {hoverInfo.classes.map((cls, index) => (
-                      <div
-                        key={index}
-                        className="p-2 border rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
-                      >
+                  <div className="space-y-3">
+                    {/* Show availability slot if exists */}
+                    {hoverInfo.availability && (
+                      <div className="p-2 border rounded-md bg-blue-50">
                         <div className="flex items-center gap-1">
-                          <span className="font-medium text-sm">
-                            Batch: {cls.batchId}
-                          </span>
+                          <Clock className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium">Available Slot</span>
                         </div>
                         <div className="text-xs mt-1">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-gray-500" />
-                            <span>Time: {formatTime(cls)}</span>
-                          </div>
-                          {cls.duration && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <Clock className="h-3 w-3 text-gray-500" />
-                              <span>Duration: {cls.duration} minutes</span>
-                            </div>
-                          )}
-                          {cls.classLink && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <Link className="h-3 w-3 text-blue-500" />
-                              <a
-                                href={
-                                  cls.classLink.startsWith("http")
-                                    ? cls.classLink
-                                    : `https://${cls.classLink}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Join Class
-                              </a>
-                            </div>
-                          )}
-                          {cls.isRecurring && cls.sessionNumber && (
-                            <div className="mt-1 text-gray-600">
-                              Session {cls.sessionNumber}
-                            </div>
-                          )}
+                          <p>Start: {hoverInfo.availability.startTime}</p>
+                          <p>End: {hoverInfo.availability.endTime}</p>
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Show classes if they exist */}
+                    {hoverInfo.classes.length > 0 && (
+                      <>
+                        <div className="text-xs font-medium text-gray-500">
+                          Scheduled Classes
+                        </div>
+                        {hoverInfo.classes.map((cls, index) => (
+                          <div
+                            key={index}
+                            className="p-2 border rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-sm">
+                                Batch: {cls.batchId}
+                              </span>
+                            </div>
+                            <div className="text-xs mt-1">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3 text-gray-500" />
+                                <span>Time: {formatTime(cls)}</span>
+                              </div>
+                              {cls.duration && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3 text-gray-500" />
+                                  <span>Duration: {cls.duration} minutes</span>
+                                </div>
+                              )}
+                              {cls.classLink && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Link className="h-3 w-3 text-blue-500" />
+                                  <a
+                                    href={
+                                      cls.classLink.startsWith("http")
+                                        ? cls.classLink
+                                        : `https://${cls.classLink}`
+                                    }
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-500 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Join Class
+                                  </a>
+                                </div>
+                              )}
+                              {cls.isRecurring && cls.sessionNumber && (
+                                <div className="mt-1 text-gray-600">
+                                  Session {cls.sessionNumber}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </div>
               )}

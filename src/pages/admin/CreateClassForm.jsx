@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import axiosInstance from "@/services/axios";
-import { Calendar, Clock, SquarePlus } from "lucide-react";
+import { Calendar, Clock, Loader2, SquarePlus } from "lucide-react";
 import { useSelector } from "react-redux";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 
@@ -49,6 +49,7 @@ const CreateClassForm = () => {
     numberOfSessions: 1,
     courseId: "", // Added courseId to formData
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch teachers, students, and courses
   const fetchUsers = async () => {
@@ -162,6 +163,7 @@ const CreateClassForm = () => {
   };
 
   const handleSubmit = async () => {
+    setIsLoading(true);
     try {
       const payload = {
         batchId: formData.batchId,
@@ -225,6 +227,8 @@ const CreateClassForm = () => {
         description: error.response?.data?.message || "Class creation failed",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false); // Stop loading in any case
     }
   };
 
@@ -439,8 +443,16 @@ const CreateClassForm = () => {
           <Button
             className="w-full bg-primary hover:bg-primary/85"
             onClick={handleSubmit}
+            disabled={isLoading}
           >
-            Create Class
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+                Creating...
+              </div>
+            ) : (
+              "Create Class"
+            )}
           </Button>
         </div>
       </div>

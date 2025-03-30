@@ -41,6 +41,21 @@ const TeacherHomework = () => {
   const [selectedType, setSelectedType] = useState("all");
   const [courses, setCourses] = useState([]);
   const [types, setTypes] = useState([]);
+  const [classes, setClasses] = useState([]);
+
+  const getUniqueStudentsFromClasses = (classes) => {
+    const uniqueStudents = new Map();
+
+    classes.forEach((classItem) => {
+      classItem.studentIds?.forEach((student) => {
+        if (!uniqueStudents.has(student._id)) {
+          uniqueStudents.set(student._id, student);
+        }
+      });
+    });
+
+    return Array.from(uniqueStudents.values());
+  };
 
   const handleAssignClick = (homework) => {
     setSelectedHomework(homework);
@@ -126,16 +141,35 @@ const TeacherHomework = () => {
     }
   };
 
-  const fetchStudents = async () => {
+  // const fetchStudents = async () => {
+  //   try {
+  //     const students = await axiosInstance.get(
+  //       `${backend_url}/profile/student`
+  //     );
+  //     setStudents(students.data.users || []);
+  //   } catch (error) {
+  //     toast({
+  //       title: "Error",
+  //       description: "Failed to fetch student data",
+  //       variant: "destructive",
+  //     });
+  //   }
+  // };
+
+  const fetchClasses = async () => {
     try {
-      const students = await axiosInstance.get(
-        `${backend_url}/profile/student`
+      const response = await axiosInstance.get(
+        `${backend_url}/profile/teacher/classes`
       );
-      setStudents(students.data.users || []);
+      setClasses(response.data.classes);
+      const studentsFromClasses = getUniqueStudentsFromClasses(
+        response.data.classes
+      );
+      setStudents(studentsFromClasses);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to fetch student data",
+        description: "Failed to fetch class data",
         variant: "destructive",
       });
     }
@@ -143,7 +177,8 @@ const TeacherHomework = () => {
 
   useEffect(() => {
     fetchHomeworks();
-    fetchStudents();
+    // fetchStudents();
+    fetchClasses();
   }, []);
 
   useEffect(() => {
@@ -337,7 +372,7 @@ const TeacherHomework = () => {
                       <SelectLabel>Students</SelectLabel>
                       {students.length === 0 ? (
                         <SelectItem value="no-students" disabled>
-                          No students available
+                          No students available in your classes
                         </SelectItem>
                       ) : (
                         students.map((student) => (

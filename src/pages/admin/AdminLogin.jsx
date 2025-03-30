@@ -39,7 +39,7 @@ const AdminLogin = () => {
       <div className="w-full lg:w-screen h-screen bg-gray-100 flex items-center justify-center px-6">
         <div className="lg:w-[30%] w-full bg-white lg:p-12 px-4 py-6 rounded-xl shadow-[0_3px_10px_rgb(0,0,0,0.2)]">
           <h1 className="text-xl lg:text-4xl font-bold text-center mb-8 lg:mb-12">
-            Welcome to LMS
+            Welcome to FcC
           </h1>
 
           <Card className="p-6 lg:p-8">

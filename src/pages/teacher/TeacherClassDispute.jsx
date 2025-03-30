@@ -11,7 +11,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Pen, Search, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+  AlertCircle,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,24 +28,17 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 const backend_url = import.meta.env.VITE_API_URL;
 
-const TeacherCompletedClasses = () => {
+const TeacherClassDispute = () => {
   const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDisputeDialogOpen, setIsDisputeDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
-  const [classType, setClassType] = useState("");
-  const [topicsTaught, setTopicsTaught] = useState("");
+  const [disputeReason, setDisputeReason] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
   // Pagination state
@@ -82,8 +81,8 @@ const TeacherCompletedClasses = () => {
               ...session,
               batchId: cls.batchId,
               courseId: cls.courseId,
-              classType: session.classType || cls.classType,
-              topicsTaught: session.topicsTaught || "",
+              adminUpdates: session.adminUpdates || cls.adminUpdates,
+              dispute: session.dispute || cls.dispute,
               startDate: session.startDateTime
                 ? formatDate(session.startDateTime)
                 : "-",
@@ -97,7 +96,8 @@ const TeacherCompletedClasses = () => {
           if (new Date(cls.startDateTime) <= currentDateTime) {
             return {
               ...cls,
-              topicsTaught: cls.topicsTaught || "",
+              adminUpdates: cls.adminUpdates || {},
+              dispute: cls.dispute || {},
               startDate: cls.startDateTime
                 ? formatDate(cls.startDateTime)
                 : "-",
@@ -119,48 +119,45 @@ const TeacherCompletedClasses = () => {
       .sort((a, b) => new Date(b.startDateTime) - new Date(a.startDateTime));
   };
 
-  // Handle opening the update dialog
-  const handleOpenUpdateDialog = (cls) => {
+  // Handle opening the dispute dialog
+  const handleOpenDisputeDialog = (cls) => {
     setSelectedClass(cls);
-    setClassType(cls.classType || "");
-    setTopicsTaught(cls.topicsTaught || "");
-    setIsUpdateDialogOpen(true);
+    setDisputeReason(cls.dispute?.reason || "");
+    setIsDisputeDialogOpen(true);
   };
 
   // Handle closing the dialog
   const handleCloseDialog = () => {
-    setIsUpdateDialogOpen(false);
+    setIsDisputeDialogOpen(false);
   };
 
-  // Handle saving the session/class update
-  const handleSaveUpdate = async () => {
+  // Handle raising a dispute
+  const handleRaiseDispute = async () => {
     try {
-      if (!selectedClass) return;
-
-      // Prepare the payload
-      const payload = {
-        topicsTaught,
-        classType,
-      };
-
-      // Add classId or sessionId to the payload based on the type of class
-      if (selectedClass.isRecurring === false) {
-        payload.classId = selectedClass._id; // Use session ID for recurring classes
-      } else {
-        payload.sessionId = selectedClass._id; // Use class ID for single classes
+      if (!selectedClass || !disputeReason) {
+        toast({
+          title: "Error",
+          description: "Dispute reason is required",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Log the payload
-      console.log("Payload:", payload);
+      const payload = {
+        reason: disputeReason,
+      };
 
-      // Call the updateByTeacher API
+      // Determine if we're disputing a session or a class
+      if (selectedClass.isRecurring === false) {
+        payload.classId = selectedClass._id;
+      } else {
+        payload.sessionId = selectedClass._id;
+      }
+
       const response = await axiosInstance.post(
-        `${backend_url}/teacher/actions/update-by-teacher`,
+        `${backend_url}/teacher/actions/raise-dispute-by-teacher`,
         payload
       );
-
-      // Log the response
-      console.log("Response:", response.data);
 
       if (response.data && response.data.success) {
         // Update the local state
@@ -171,8 +168,11 @@ const TeacherCompletedClasses = () => {
               if (session._id === selectedClass._id) {
                 return {
                   ...session,
-                  topicsTaught,
-                  classType,
+                  dispute: {
+                    reason: disputeReason,
+                    isResolved: false,
+                    raisedAt: new Date().toISOString(),
+                  },
                 };
               }
               return session;
@@ -182,28 +182,27 @@ const TeacherCompletedClasses = () => {
             // For single classes, update the class directly
             return {
               ...classItem,
-              topicsTaught,
-              classType,
+              dispute: {
+                reason: disputeReason,
+                isResolved: false,
+                raisedAt: new Date().toISOString(),
+              },
             };
           }
           return classItem;
         });
 
         setClasses(updatedClasses);
+        toast({
+          title: "Success",
+          description: "Dispute raised successfully",
+          variant: "success",
+        });
       }
-      toast({
-        title: "Success",
-        description: "Class/Session updated successfully",
-        variant: "success",
-      });
     } catch (error) {
-      // Log the error
-      console.error("Error:", error.response?.data || error.message);
-
       toast({
         title: "Error",
-        description:
-          error.response?.data?.message || "Failed to update class/session",
+        description: error.response?.data?.message || "Failed to raise dispute",
         variant: "destructive",
       });
     } finally {
@@ -264,17 +263,26 @@ const TeacherCompletedClasses = () => {
     setCurrentPage(1); // Reset to first page when clearing search
   };
 
-  const formatClassType = (type) => {
-    if (!type) return "-";
+  const formatAdminUpdates = (adminUpdates) => {
+    if (!adminUpdates) return "-";
 
-    const typeMap = {
-      regular: "Regular",
-      student_absent: "Student Absent",
-      ptm: "PTM",
-      test: "Test",
-    };
+    let result = [];
+    if (adminUpdates.type) result.push(`Type: ${adminUpdates.type}`);
+    if (adminUpdates.amount) result.push(`Amount: ₹${adminUpdates.amount}`);
+    if (adminUpdates.penalty) result.push(`Penalty: ${adminUpdates.penalty}`);
+    if (adminUpdates.joinTime)
+      result.push(`Joined: ${formatTime(adminUpdates.joinTime)}`);
 
-    return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1);
+    return result.join(" | ") || "-";
+  };
+
+  const getDisputeStatusBadge = (dispute) => {
+    if (!dispute || !dispute.reason) return null;
+
+    if (dispute.isResolved) {
+      return <Badge className="bg-green-500 text-white">Resolved</Badge>;
+    }
+    return <Badge variant="destructive">Pending</Badge>;
   };
 
   return (
@@ -282,7 +290,7 @@ const TeacherCompletedClasses = () => {
       <TeacherSidebar />
       <div className="p-6 overflow-x-hidden w-full min-h-screen bg-gray-50">
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
-          <h1 className="text-xl font-semibold">Classes Summary Fill</h1>
+          <h1 className="text-xl font-semibold">Class Updates</h1>
           <div className="relative w-64">
             <Input
               type="text"
@@ -319,9 +327,12 @@ const TeacherCompletedClasses = () => {
                   <TableHead>Time</TableHead>
                   <TableHead>Batch ID</TableHead>
                   <TableHead>Course</TableHead>
-                  <TableHead>Class Type</TableHead>
-                  <TableHead>Topics Taught</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Penalty</TableHead>
+                  <TableHead>Join Time</TableHead>
+                  <TableHead>Dispute Status</TableHead>
+                  <TableHead>Raise Dispute</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -344,19 +355,34 @@ const TeacherCompletedClasses = () => {
                       <TableCell>{cls.startTime}</TableCell>
                       <TableCell>{cls.batchId}</TableCell>
                       <TableCell>{cls.courseId?.name || "-"}</TableCell>
-                      <TableCell>{formatClassType(cls.classType)}</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {cls.topicsTaught || "-"}
+                      <TableCell className="capitalize">
+                        {cls.adminUpdates?.type || "-"}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenUpdateDialog(cls)}
-                          className="hover:bg-gray-200 rounded-full"
-                        >
-                          <Pen className="h-4 w-4" />
-                        </Button>
+                        {cls.adminUpdates?.amount
+                          ? `₹${cls.adminUpdates.amount}`
+                          : "-"}
+                      </TableCell>
+                      <TableCell>{cls.adminUpdates?.penalty || "-"}</TableCell>
+                      <TableCell>
+                        {cls.adminUpdates?.joinTime
+                          ? formatTime(cls.adminUpdates.joinTime)
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {getDisputeStatusBadge(cls.dispute)}
+                      </TableCell>
+                      <TableCell>
+                        {(!cls.dispute || !cls.dispute.reason) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDisputeDialog(cls)}
+                            className="hover:bg-gray-200 rounded-full"
+                          >
+                            <AlertCircle className="h-4 w-4 text-yellow-600" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -399,50 +425,41 @@ const TeacherCompletedClasses = () => {
         )}
       </div>
 
-      {/* Update Dialog */}
-      <Dialog open={isUpdateDialogOpen} onOpenChange={handleCloseDialog}>
+      {/* Dispute Dialog */}
+      <Dialog open={isDisputeDialogOpen} onOpenChange={handleCloseDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update Session Details</DialogTitle>
+            <DialogTitle>Raise Dispute</DialogTitle>
             <DialogDescription>
-              Add the topics taught and class type for this session.
+              Please provide details about the issue you&apos;re disputing.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="topicsTaught">Topics Taught</Label>
+              <Label htmlFor="disputeReason">Reason for Dispute</Label>
               <Textarea
-                id="topicsTaught"
-                value={topicsTaught}
-                onChange={(e) => setTopicsTaught(e.target.value)}
-                placeholder="Enter topics covered in this session..."
+                id="disputeReason"
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="Describe the issue you're disputing..."
                 className="min-h-32"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="classType">Type of Class</Label>
-              <Select
-                value={classType}
-                onValueChange={(value) => setClassType(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select class type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="regular">Regular</SelectItem>
-                  <SelectItem value="student_absent">Student Absent</SelectItem>
-                  <SelectItem value="ptm">PTM</SelectItem>
-                  <SelectItem value="test">Test</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {selectedClass?.adminUpdates && (
+              <div className="p-4 bg-gray-100 rounded-md">
+                <h4 className="font-medium mb-2">Admin Updates:</h4>
+                <p className="text-sm">
+                  {formatAdminUpdates(selectedClass.adminUpdates)}
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCloseDialog}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleSaveUpdate}>
-              Save Changes
+            <Button type="button" onClick={handleRaiseDispute}>
+              Submit Dispute
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -451,4 +468,4 @@ const TeacherCompletedClasses = () => {
   );
 };
 
-export default TeacherCompletedClasses;
+export default TeacherClassDispute;

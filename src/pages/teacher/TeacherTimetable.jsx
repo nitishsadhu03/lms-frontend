@@ -247,7 +247,7 @@ const TeacherTimetable = () => {
 
   const getClassesForDate = (day) => {
     return classes.filter((cls) => {
-      const classDate = new Date(cls.startDateTime);
+      const classDate = new Date(cls.startDateTime || cls.startDate);
       return (
         classDate.getFullYear() === currentDate.getFullYear() &&
         classDate.getMonth() === currentDate.getMonth() &&
@@ -293,7 +293,8 @@ const TeacherTimetable = () => {
   };
 
   const isDateAvailable = (day) => {
-    return getAvailabilityForDate(day) !== undefined;
+    const availability = getAvailabilityForDate(day);
+    return availability && availability.startTime && availability.endTime;
   };
 
   const handleDateClick = (day) => {
@@ -302,28 +303,24 @@ const TeacherTimetable = () => {
     const dayStr = day.toString().padStart(2, "0");
     const dateStr = `${year}-${month}-${dayStr}`;
 
-    // Check if the date is already marked as available
-    const isAlreadyAvailable = availabilityList.some((avail) => {
-      const availDate = new Date(avail.date);
-      return (
-        availDate.getFullYear() === year &&
-        availDate.getMonth() + 1 === parseInt(month) &&
-        availDate.getDate() === day
-      );
-    });
+    const isAlreadyAvailable = isDateAvailable(day);
+    const hasClasses = hasClassesOnDate(day);
 
     if (isAlreadyAvailable) {
-      // Show a dialog box for already available dates
       setShowErrorDialog(true);
       return;
     }
 
-    if (hasClassesOnDate(day)) {
+    if (hasClasses) {
       setShowErrorDialog(true);
       return;
     }
 
     setSelectedDate(dateStr);
+    setAvailabilityData((prev) => ({
+      ...prev,
+      date: dateStr,
+    }));
     setShowMarkFreeModal(true);
   };
 
@@ -384,6 +381,17 @@ const TeacherTimetable = () => {
         ? [...prev.days, day] // Add day if checked
         : prev.days.filter((d) => d !== day), // Remove day if unchecked
     }));
+  };
+
+  const filterAvailabilitySlots = (slots) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+
+    return slots.filter((slot) => {
+      const slotDate = new Date(slot.date);
+      slotDate.setHours(0, 0, 0, 0); // Set to start of day
+      return slotDate >= today;
+    });
   };
 
   // Handle time change for a specific day
@@ -477,38 +485,33 @@ const TeacherTimetable = () => {
 
   const handleMouseEnter = (day, event) => {
     const classes = getClassesForDate(day);
+    const availability = getAvailabilityForDate(day);
 
-    if (classes.length > 0) {
-      // Clear any existing timeout
+    if (classes.length > 0 || availability) {
       if (popupTimeoutRef.current) {
         clearTimeout(popupTimeoutRef.current);
       }
 
-      // Calculate the position for the popup
       const rect = event.currentTarget.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
-      const popupHeight = 300; // Adjusted height for classes content
+      const popupHeight = classes.length > 0 && availability ? 400 : 300;
 
-      // If cell is in the right portion of the screen, show popup to the left
       const leftOffset = rect.left + window.scrollX;
       const xPos =
         leftOffset + 300 > viewportWidth
           ? Math.max(0, leftOffset - 280)
           : leftOffset;
-
-      // Position the popup above the cell instead of below
       const yPos = rect.top + window.scrollY - popupHeight;
 
-      // Set a small delay before showing the popup to avoid flickering
       popupTimeoutRef.current = setTimeout(() => {
         setHoverInfo({
           visible: true,
           classes: classes,
-          availability: null, // Always set availability to null
+          availability: availability,
           day: day,
           position: {
             x: xPos,
-            y: Math.max(0, yPos), // Ensure popup doesn't go above viewport
+            y: Math.max(0, yPos),
           },
         });
       }, 200);
@@ -550,7 +553,7 @@ const TeacherTimetable = () => {
         <div
           key={day}
           className={`min-h-[60px] sm:min-h-[80px] md:min-h-[100px] border p-1 sm:p-2 relative cursor-pointer transition-colors
-            ${hasClasses ? "bg-gray-100" : "hover:bg-gray-50"}`}
+      ${hasClasses ? "bg-gray-100" : "hover:bg-gray-50"}`}
           onClick={() => handleDateClick(day)}
           onMouseEnter={(e) => handleMouseEnter(day, e)}
           onMouseLeave={handleMouseLeave}
@@ -560,11 +563,16 @@ const TeacherTimetable = () => {
           </span>
           <div className="mt-6 sm:mt-8 space-y-1">
             {hasClasses && (
-              <div
-                className={`p-1 rounded-full text-center bg-green-500 hover:bg-green-600 transition-colors`}
-              >
+              <div className="p-1 rounded-full text-center bg-green-500 hover:bg-green-600 transition-colors">
                 <span className="text-[7.5px] sm:text-xs md:text-sm text-white lg:font-medium block">
                   {classCount > 1 ? `${classCount} Classes` : "1 Class"}
+                </span>
+              </div>
+            )}
+            {isDateAvailable(day) && (
+              <div className="p-1 rounded-full text-center bg-blue-500 hover:bg-blue-600 transition-colors">
+                <span className="text-[7.5px] sm:text-xs md:text-sm text-white lg:font-medium block">
+                  Available
                 </span>
               </div>
             )}
@@ -762,38 +770,48 @@ const TeacherTimetable = () => {
                   Availability Slots
                 </h3>
                 <hr className="mt-2 mb-4" />
-                {availabilityList.length === 0 ? (
+                {filterAvailabilitySlots(availabilityList).length === 0 ? (
                   <div className="p-4 bg-gray-50 rounded-md border border-gray-200 text-center">
-                    <p className="text-gray-600">No availability slots set.</p>
+                    <p className="text-gray-600">
+                      No upcoming availability slots.
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {availabilityList.map((slot, index) => (
-                      <div
-                        key={index}
-                        className="p-3 sm:p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
-                      >
-                        <div className="mt-2 text-sm sm:text-base">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
-                            <p className="font-medium">
-                              {new Date(slot.date).toLocaleDateString("en-GB", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                              })}{" "}
-                              (
-                              {new Date(slot.date).toLocaleDateString("en-GB", {
-                                weekday: "long",
-                              })}
-                              )
-                            </p>
-                          </span>
-                          <p>Start Time: {slot.startTime}</p>
-                          <p>End Time: {slot.endTime}</p>
+                    {filterAvailabilitySlots(availabilityList).map(
+                      (slot, index) => (
+                        <div
+                          key={index}
+                          className="p-3 sm:p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          <div className="mt-2 text-sm sm:text-base">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                              <p className="font-medium">
+                                {new Date(slot.date).toLocaleDateString(
+                                  "en-GB",
+                                  {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                  }
+                                )}{" "}
+                                (
+                                {new Date(slot.date).toLocaleDateString(
+                                  "en-GB",
+                                  {
+                                    weekday: "long",
+                                  }
+                                )}
+                                )
+                              </p>
+                            </span>
+                            <p>Start Time: {slot.startTime}</p>
+                            <p>End Time: {slot.endTime}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 )}
               </div>
@@ -806,7 +824,7 @@ const TeacherTimetable = () => {
                   style={{
                     left: `${hoverInfo.position.x}px`,
                     top: `${hoverInfo.position.y}px`,
-                    maxHeight: "300px",
+                    maxHeight: "400px",
                     overflowY: "auto",
                     opacity: hoverInfo.visible ? 1 : 0,
                     pointerEvents: hoverInfo.visible ? "auto" : "none",
@@ -819,91 +837,86 @@ const TeacherTimetable = () => {
                   onMouseLeave={handleMouseLeave}
                 >
                   <h4 className="text-sm font-semibold mb-2">
-                    {hoverInfo.classes.length > 0 &&
-                      `Classes on ${formatDate(
-                        hoverInfo.classes[0]?.startTime
-                      )}`}
+                    {new Date(
+                      currentDate.getFullYear(),
+                      currentDate.getMonth(),
+                      hoverInfo.day
+                    ).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </h4>
+
                   <div className="space-y-3">
-                    {/* Display classes information */}
-                    {hoverInfo.visible && (
-                      <div
-                        ref={popupRef}
-                        className="fixed z-50 bg-white shadow-lg rounded-lg p-3 border border-gray-200 w-64 sm:w-80 transition-opacity duration-200 ease-in-out"
-                        style={{
-                          left: `${hoverInfo.position.x}px`,
-                          top: `${hoverInfo.position.y}px`,
-                          maxHeight: "300px",
-                          overflowY: "auto",
-                          opacity: hoverInfo.visible ? 1 : 0,
-                          pointerEvents: hoverInfo.visible ? "auto" : "none",
-                        }}
-                        onMouseEnter={() => {
-                          if (popupTimeoutRef.current) {
-                            clearTimeout(popupTimeoutRef.current);
-                          }
-                        }}
-                        onMouseLeave={handleMouseLeave}
-                      >
-                        <h4 className="text-sm font-semibold mb-2">
-                          {hoverInfo.classes.length > 0 &&
-                            `Classes on ${formatDate(
-                              hoverInfo.classes[0]?.startDateTime // Use startDateTime instead of startTime
-                            )}`}
-                        </h4>
-                        <div className="space-y-3">
-                          {/* Display classes information */}
-                          {hoverInfo.classes.map((cls, index) => (
-                            <div
-                              key={index}
-                              className="p-2 border rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
-                            >
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium text-sm">
-                                  Batch: {cls.batchId}
-                                </span>
-                              </div>
-                              <div className="text-xs mt-1">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-gray-500" />
-                                  <span>Time: {formatTime(cls)}</span>
-                                </div>
-                                {cls.duration && (
-                                  <div className="flex items-center gap-1 mt-1">
-                                    <Clock className="h-3 w-3 text-gray-500" />
-                                    <span>
-                                      Duration: {cls.duration} minutes
-                                    </span>
-                                  </div>
-                                )}
-                                {cls.classLink && (
-                                  <div className="flex items-center gap-1 mt-1">
-                                    <Link className="h-3 w-3 text-blue-500" />
-                                    <a
-                                      href={
-                                        cls.classLink.startsWith("http")
-                                          ? cls.classLink
-                                          : `https://${cls.classLink}`
-                                      }
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-500 hover:underline"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      Join Class
-                                    </a>
-                                  </div>
-                                )}
-                                {cls.isRecurring && cls.sessionNumber && (
-                                  <div className="mt-1 text-gray-600">
-                                    Session {cls.sessionNumber}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                    {/* Show availability slot if exists */}
+                    {hoverInfo.availability && (
+                      <div className="p-2 border rounded-md bg-blue-50">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium">Available Slot</span>
+                        </div>
+                        <div className="text-xs mt-1">
+                          <p>Start: {hoverInfo.availability.startTime}</p>
+                          <p>End: {hoverInfo.availability.endTime}</p>
                         </div>
                       </div>
+                    )}
+
+                    {/* Show classes if they exist */}
+                    {hoverInfo.classes.length > 0 && (
+                      <>
+                        <div className="text-xs font-medium text-gray-500">
+                          Scheduled Classes
+                        </div>
+                        {hoverInfo.classes.map((cls, index) => (
+                          <div
+                            key={index}
+                            className="p-2 border rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-sm">
+                                Batch: {cls.batchId}
+                              </span>
+                            </div>
+                            <div className="text-xs mt-1">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3 text-gray-500" />
+                                <span>Time: {formatTime(cls)}</span>
+                              </div>
+                              {cls.duration && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3 text-gray-500" />
+                                  <span>Duration: {cls.duration} minutes</span>
+                                </div>
+                              )}
+                              {cls.classLink && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Link className="h-3 w-3 text-blue-500" />
+                                  <a
+                                    href={
+                                      cls.classLink.startsWith("http")
+                                        ? cls.classLink
+                                        : `https://${cls.classLink}`
+                                    }
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-500 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Join Class
+                                  </a>
+                                </div>
+                              )}
+                              {cls.isRecurring && cls.sessionNumber && (
+                                <div className="mt-1 text-gray-600">
+                                  Session {cls.sessionNumber}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
                     )}
                   </div>
                 </div>

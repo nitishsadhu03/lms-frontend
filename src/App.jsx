@@ -38,6 +38,7 @@ import TeacherClassRecordings from "./pages/teacher/TeacherClassRecordings";
 import CreateClassForm from "./pages/admin/CreateClassForm";
 import ViewTeacherClasses from "./pages/admin/ViewTeacherClasses";
 import TeacherCompletedClasses from "./pages/teacher/TeacherCompletedClasses";
+import TeacherClassDipute from "./pages/teacher/TeacherClassDispute";
 
 const router = createBrowserRouter([
   {
@@ -151,6 +152,10 @@ const router = createBrowserRouter([
   {
     path: "/fcc_staffroom/completed-classes",
     element: <TeacherCompletedClasses />,
+  },
+  {
+    path: "/fcc_staffroom/class-updates",
+    element: <TeacherClassDipute />,
   },
   {
     path: "/fcc_classroom",
