@@ -41,7 +41,7 @@ const TeacherCompletedClasses = () => {
   const [classType, setClassType] = useState("");
   const [topicsTaught, setTopicsTaught] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,6 +64,17 @@ const TeacherCompletedClasses = () => {
     const ampm = hours >= 12 ? "PM" : "AM";
     const formattedHours = hours % 12 || 12;
     return `${formattedHours}:${minutes} ${ampm}`;
+  };
+
+  const isEditable = (startDateTime) => {
+    if (!startDateTime) return false;
+
+    const classTime = new Date(startDateTime);
+    const currentTime = new Date();
+    const timeDifference = currentTime - classTime; // in milliseconds
+    const hoursDifference = timeDifference / (1000 * 60 * 60);
+
+    return hoursDifference <= 48;
   };
 
   // Process classes data to extract sessions and filter by startDateTime
@@ -92,6 +103,7 @@ const TeacherCompletedClasses = () => {
                 ? formatTime(session.startDateTime)
                 : "-",
               startDateTime: session.startDateTime,
+              isEditable: isEditable(session.startDateTime),
             }));
         } else {
           // For non-recurring classes, filter classes that have started
@@ -106,6 +118,7 @@ const TeacherCompletedClasses = () => {
                 ? formatTime(cls.startDateTime)
                 : "-",
               startDateTime: cls.startDateTime,
+              isEditable: isEditable(cls.startDateTime),
             };
           }
           return null;
@@ -357,6 +370,12 @@ const TeacherCompletedClasses = () => {
                           size="icon"
                           onClick={() => handleOpenUpdateDialog(cls)}
                           className="hover:bg-gray-200 rounded-full"
+                          disabled={!cls.isEditable}
+                          title={
+                            cls.isEditable
+                              ? ""
+                              : "Editing disabled after 48 hours"
+                          }
                         >
                           <Pen className="h-4 w-4" />
                         </Button>
@@ -444,7 +463,11 @@ const TeacherCompletedClasses = () => {
             <Button type="button" variant="outline" onClick={handleCloseDialog}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleSaveUpdate} disabled={isSubmitting}>
+            <Button
+              type="button"
+              onClick={handleSaveUpdate}
+              disabled={isSubmitting}
+            >
               Save Changes
             </Button>
           </DialogFooter>

@@ -22,6 +22,7 @@ import {
   Check,
   Ban,
   Pen,
+  Eye,
 } from "lucide-react";
 import {
   Dialog,
@@ -61,8 +62,8 @@ const ViewTeacherClasses = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [remarks, setRemarks] = useState("");
   const [disputeAction, setDisputeAction] = useState("resolve");
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isDisputeSubmitting, setIsDisputeSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDisputeSubmitting, setIsDisputeSubmitting] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,6 +73,7 @@ const ViewTeacherClasses = () => {
   const [typeFilter, setTypeFilter] = useState("all");
   const [penaltyFilter, setPenaltyFilter] = useState("all");
   const [disputeFilter, setDisputeFilter] = useState("all");
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   // Filter options
   const typeOptions = ["paid", "cancelled", "rescheduled", "unsuccessful"];
@@ -86,6 +88,16 @@ const ViewTeacherClasses = () => {
     "Delayed Full",
     "Summary not filled",
   ];
+
+  // Add these with your other handler functions
+  const handleOpenViewDialog = (cls) => {
+    setSelectedClass(cls);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleCloseViewDialog = () => {
+    setIsViewDialogOpen(false);
+  };
 
   // Get initials from name
   const getInitials = (name) => {
@@ -113,7 +125,8 @@ const ViewTeacherClasses = () => {
             .map((session) => ({
               ...session,
               batchId: cls.batchId,
-              classType: cls.classType,
+              classType: session.classType || cls.classType,
+              topicsTaught: session.topicsTaught || "",
               adminUpdates: session.adminUpdates || cls.adminUpdates,
               dispute: session.dispute || cls.dispute,
               startDate: session.startDateTime
@@ -128,6 +141,7 @@ const ViewTeacherClasses = () => {
           if (new Date(cls.startDateTime) <= currentDateTime) {
             return {
               ...cls,
+              topicsTaught: cls.topicsTaught || "",
               startDate: cls.startDateTime
                 ? formatDate(cls.startDateTime)
                 : "-",
@@ -292,6 +306,7 @@ const ViewTeacherClasses = () => {
       const payload = {
         remarks,
         action: disputeAction,
+        status: disputeAction === "resolve" ? "resolved" : "rejected",
       };
 
       if (selectedClass.isRecurring === false) {
@@ -314,7 +329,8 @@ const ViewTeacherClasses = () => {
                   ...session,
                   dispute: {
                     ...session.dispute,
-                    isResolved: true,
+                    status:
+                      disputeAction === "resolve" ? "resolved" : "rejected",
                     remarks,
                   },
                 };
@@ -327,7 +343,7 @@ const ViewTeacherClasses = () => {
               ...cls,
               dispute: {
                 ...cls.dispute,
-                isResolved: true,
+                status: disputeAction === "resolve" ? "resolved" : "rejected",
                 remarks,
               },
             };
@@ -338,9 +354,7 @@ const ViewTeacherClasses = () => {
         setClasses(updatedClasses);
         toast({
           title: "Success",
-          description: `Dispute ${
-            disputeAction === "resolve" ? "resolved" : "rejected"
-          } successfully`,
+          description: `Dispute updated successfully`,
           variant: "success",
         });
       }
@@ -418,13 +432,13 @@ const ViewTeacherClasses = () => {
       // Dispute filter
       if (
         disputeFilter === "pending" &&
-        (!cls.dispute?.reason || cls.dispute?.isResolved)
+        (!cls.dispute?.reason || cls.dispute?.status !== "pending")
       ) {
         return false;
       }
       if (
         disputeFilter === "resolved" &&
-        (!cls.dispute?.reason || !cls.dispute?.isResolved)
+        (!cls.dispute?.reason || cls.dispute?.status !== "resolved")
       ) {
         return false;
       }
@@ -474,11 +488,29 @@ const ViewTeacherClasses = () => {
   // Get dispute badge
   const getDisputeBadge = (dispute) => {
     if (!dispute?.reason) return null;
-    return dispute.isResolved ? (
-      <Badge className="bg-green-500 text-white hover:bg-green-400">Resolved</Badge>
-    ) : (
-      <Badge variant="destructive">Pending</Badge>
-    );
+
+    switch (dispute.status) {
+      case "resolved":
+        return (
+          <Badge className="bg-green-500 text-white hover:bg-green-400">
+            Resolved
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge className="bg-red-500 text-white hover:bg-red-400">
+            Rejected
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-yellow-500 text-white hover:bg-yellow-400">
+            Pending
+          </Badge>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -651,12 +683,26 @@ const ViewTeacherClasses = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleOpenViewDialog(cls)}
+                            className="hover:bg-gray-200 rounded-full"
+                          >
+                            <Eye className="h-4 w-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleOpenUpdateDialog(cls)}
                             className="hover:bg-gray-200 rounded-full"
+                            disabled={!cls.classType || !cls.topicsTaught}
+                            title={
+                              !cls.classType || !cls.topicsTaught
+                                ? "Cannot edit - Class type or topics not filled"
+                                : ""
+                            }
                           >
                             <Pen className="h-4 w-4" />
                           </Button>
-                          {cls.dispute?.reason && !cls.dispute?.isResolved && (
+                          {cls.dispute?.status === "pending" && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -708,6 +754,78 @@ const ViewTeacherClasses = () => {
           </div>
         )}
       </div>
+
+      {/* View Details Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={handleCloseViewDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Class/Session Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Date</Label>
+                <p className="p-2 bg-gray-100 rounded-md text-sm font-medium">
+                  {selectedClass?.startDate}
+                </p>
+              </div>
+              <div>
+                <Label>Time</Label>
+                <p className="p-2 bg-gray-100 rounded-md text-sm font-medium">
+                  {selectedClass?.startTime}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <Label>Class Type</Label>
+              <p className="p-2 bg-gray-100 rounded-md capitalize text-sm font-medium">
+                {selectedClass?.classType || "Not specified"}
+              </p>
+            </div>
+
+            <div>
+              <Label>Topics Taught</Label>
+              <p className="p-2 bg-gray-100 rounded-md whitespace-pre-line text-sm font-medium">
+                {selectedClass?.topicsTaught || "Not specified"}
+              </p>
+            </div>
+
+            {selectedClass?.dispute && (
+              <div className="border-t pt-4">
+                <Label>Dispute Details</Label>
+                <div className="space-y-2 mt-2">
+                  <div>
+                    <Label className="text-sm">Reason:</Label>
+                    <p className="p-2 bg-gray-100 rounded-md text-sm font-medium">
+                      {selectedClass.dispute.reason}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Status:</Label>
+                    <div className="mt-1">
+                      {getDisputeBadge(selectedClass.dispute)}
+                    </div>
+                  </div>
+                  {selectedClass.dispute.remarks && (
+                    <div>
+                      <Label className="text-sm">Admin Remarks:</Label>
+                      <p className="p-2 bg-gray-100 rounded-md text-sm font-medium">
+                        {selectedClass.dispute.remarks}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={handleCloseViewDialog}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Admin Updates Dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
@@ -774,7 +892,11 @@ const ViewTeacherClasses = () => {
             >
               Cancel
             </Button>
-            <Button type="button" onClick={handleSaveUpdate} disabled={isSubmitting}>
+            <Button
+              type="button"
+              onClick={handleSaveUpdate}
+              disabled={isSubmitting}
+            >
               Save Changes
             </Button>
           </DialogFooter>
@@ -827,7 +949,11 @@ const ViewTeacherClasses = () => {
             >
               Cancel
             </Button>
-            <Button type="button" onClick={handleResolveDispute} disabled={isDisputeSubmitting}>
+            <Button
+              type="button"
+              onClick={handleResolveDispute}
+              disabled={isDisputeSubmitting}
+            >
               {disputeAction === "resolve" ? "Resolve" : "Reject"} Dispute
             </Button>
           </DialogFooter>

@@ -43,7 +43,8 @@ const TeacherClassDispute = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
   const [currentRemarks, setCurrentRemarks] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentDisputeReason, setCurrentDisputeReason] = useState("");
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -135,8 +136,9 @@ const TeacherClassDispute = () => {
     setIsDisputeDialogOpen(false);
   };
 
-  const handleOpenRemarksDialog = (remarks) => {
+  const handleOpenRemarksDialog = (remarks, reason) => {
     setCurrentRemarks(remarks);
+    setCurrentDisputeReason(reason);
     setIsRemarksDialogOpen(true);
   };
 
@@ -184,8 +186,7 @@ const TeacherClassDispute = () => {
                   ...session,
                   dispute: {
                     reason: disputeReason,
-                    isResolved: false,
-                    raisedAt: new Date().toISOString(),
+                    status: "pending",
                   },
                 };
               }
@@ -198,8 +199,7 @@ const TeacherClassDispute = () => {
               ...classItem,
               dispute: {
                 reason: disputeReason,
-                isResolved: false,
-                raisedAt: new Date().toISOString(),
+                status: "pending",
               },
             };
           }
@@ -294,14 +294,20 @@ const TeacherClassDispute = () => {
   const getDisputeStatusBadge = (dispute) => {
     if (!dispute || !dispute.reason) return null;
 
-    if (dispute.isResolved) {
-      return (
-        <Badge className="bg-green-500 text-white hover:bg-green-400">
-          Resolved
-        </Badge>
-      );
+    switch (dispute.status) {
+      case "resolved":
+        return <Badge className="bg-green-500">Resolved</Badge>;
+      case "rejected":
+        return <Badge className="bg-red-500">Rejected</Badge>;
+      case "pending":
+        return (
+          <Badge className="bg-yellow-500 text-white hover:bg-yellow-400">
+            Pending
+          </Badge>
+        );
+      default:
+        return null;
     }
-    return <Badge variant="destructive">Pending</Badge>;
   };
 
   return (
@@ -392,28 +398,31 @@ const TeacherClassDispute = () => {
                         {getDisputeStatusBadge(cls.dispute)}
                       </TableCell>
                       <TableCell>
-                        {cls.dispute?.remarks ? (
+                        {cls.dispute?.status ? (
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() =>
-                              handleOpenRemarksDialog(cls.dispute.remarks)
+                              handleOpenRemarksDialog(
+                                cls.dispute.remarks,
+                                cls.dispute.reason
+                              )
                             }
                             className="text-blue-600 hover:text-blue-800 hover:bg-gray-200 rounded-full"
                           >
-                            <Eye className="h-5 w-5"/>
+                            <Eye className="h-5 w-5" />
+                            {/* <span className="ml-1">View</span> */}
                           </Button>
                         ) : (
-                          (!cls.dispute || !cls.dispute.reason) && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenDisputeDialog(cls)}
-                              className="hover:bg-gray-200 rounded-full"
-                            >
-                              <AlertCircle className="h-4 w-4 text-yellow-600" />
-                            </Button>
-                          )
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDisputeDialog(cls)}
+                            className="hover:bg-gray-200 rounded-full"
+                            disabled={!!cls.dispute?.status} // Disable if dispute already exists
+                          >
+                            <AlertCircle className="h-4 w-4 text-yellow-600" />
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
@@ -464,13 +473,21 @@ const TeacherClassDispute = () => {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Dispute Remarks</DialogTitle>
-            <DialogDescription>
-              Admin response to your dispute
-            </DialogDescription>
+            <DialogTitle>Dispute Details</DialogTitle>
           </DialogHeader>
-          <div className="p-4 bg-gray-100 rounded-md">
-            <p className="text-sm">{currentRemarks}</p>
+          <div className="space-y-4">
+            <div>
+              <Label>Your Dispute Reason:</Label>
+              <p className="p-2 bg-gray-100 rounded-md mt-1 text-sm font-medium">
+                {currentDisputeReason || "Not available"}
+              </p>
+            </div>
+            <div>
+              <Label>Admin Response:</Label>
+              <p className="p-2 bg-gray-100 rounded-md mt-1 text-sm font-medium">
+                {currentRemarks || "No response yet"}
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" onClick={handleCloseRemarksDialog}>
@@ -513,7 +530,11 @@ const TeacherClassDispute = () => {
             <Button type="button" variant="outline" onClick={handleCloseDialog}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleRaiseDispute} disabled={isSubmitting}>
+            <Button
+              type="button"
+              onClick={handleRaiseDispute}
+              disabled={isSubmitting}
+            >
               Submit Dispute
             </Button>
           </DialogFooter>
