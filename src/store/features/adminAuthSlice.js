@@ -20,6 +20,35 @@ export const loginAdmin = createAsyncThunk(
   }
 );
 
+export const forgotAdminPassword = createAsyncThunk(
+  'adminAuth/forgotPassword',
+  async ({ username }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post('/login/forgot-password', {
+        username,
+        role: 'admin'
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const resetAdminPassword = createAsyncThunk(
+  'adminAuth/resetPassword',
+  async ({ token, newPassword }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post(`/login/reset-password/${token}`, {
+        newPassword
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 const adminAuthSlice = createSlice({
   name: 'adminAuth',
   initialState: {
@@ -28,6 +57,7 @@ const adminAuthSlice = createSlice({
     token: localStorage.getItem('adminToken'),
     isLoading: false,
     error: null,
+    resetStatus: null,
   },
   reducers: {
     logout: (state) => {
@@ -39,6 +69,9 @@ const adminAuthSlice = createSlice({
     },
     clearError: (state) => {
       state.error = null;
+    },
+    clearResetStatus: (state) => {
+      state.resetStatus = null;
     },
     updateProfile: (state, action) => {
       state.profile = action.payload;
@@ -60,9 +93,34 @@ const adminAuthSlice = createSlice({
       .addCase(loginAdmin.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload?.message || 'Login failed';
+      })
+      .addCase(forgotAdminPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(forgotAdminPassword.fulfilled, (state) => {
+        state.isLoading = false;
+        state.resetStatus = 'pending';
+      })
+      .addCase(forgotAdminPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload?.message || 'Failed to send reset email';
+      })
+      .addCase(resetAdminPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resetAdminPassword.fulfilled, (state) => {
+        state.isLoading = false;
+        state.resetStatus = 'success';
+      })
+      .addCase(resetAdminPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload?.message || 'Failed to reset password';
+        state.resetStatus = 'failed';
       });
   },
 });
 
-export const { logout: adminLogout, clearError: adminClearError, updateProfile } = adminAuthSlice.actions;
+export const { logout: adminLogout, clearError: adminClearError, updateProfile, clearResetStatus  } = adminAuthSlice.actions;
 export default adminAuthSlice.reducer;

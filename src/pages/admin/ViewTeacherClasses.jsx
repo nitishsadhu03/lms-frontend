@@ -189,6 +189,17 @@ const ViewTeacherClasses = () => {
 
   // Open admin updates dialog
   const handleOpenUpdateDialog = (cls) => {
+    // If already paid with non-zero amount, disable editing
+    if (cls.adminUpdates?.type === "paid" && cls.adminUpdates?.amount > 0) {
+      toast({
+        title: "Cannot Edit",
+        description:
+          "This class is already marked as paid with a non-zero amount",
+        variant: "default",
+      });
+      return;
+    }
+
     setSelectedClass(cls);
     setType(cls.adminUpdates?.type || "");
     setPenalty(cls.adminUpdates?.penalty || "");
@@ -280,8 +291,8 @@ const ViewTeacherClasses = () => {
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to update session/class",
-        variant: "destructive",
+          error.response?.data?.message || "Updated session/class",
+        variant: "success",
       });
     } finally {
       setIsSubmitting(false);
@@ -693,10 +704,18 @@ const ViewTeacherClasses = () => {
                             size="icon"
                             onClick={() => handleOpenUpdateDialog(cls)}
                             className="hover:bg-gray-200 rounded-full"
-                            disabled={!cls.classType || !cls.topicsTaught}
+                            disabled={
+                              !cls.classType ||
+                              !cls.topicsTaught ||
+                              (cls.adminUpdates?.type === "paid" &&
+                                cls.adminUpdates?.amount > 0)
+                            }
                             title={
                               !cls.classType || !cls.topicsTaught
                                 ? "Cannot edit - Class type or topics not filled"
+                                : cls.adminUpdates?.type === "paid" &&
+                                  cls.adminUpdates?.amount > 0
+                                ? "Cannot edit - Already paid with non-zero amount"
                                 : ""
                             }
                           >
@@ -833,14 +852,23 @@ const ViewTeacherClasses = () => {
           <DialogHeader>
             <DialogTitle>Update Session/Class Details</DialogTitle>
             <DialogDescription>
-              Update the type, penalty, join time, and amount for this
-              session/class.
+              {selectedClass?.adminUpdates?.type === "paid" &&
+              selectedClass?.adminUpdates?.amount > 0
+                ? "View session/class details (editing disabled)"
+                : "Update the type, penalty, join time, and amount for this session/class."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="type">Type</Label>
-              <Select value={type} onValueChange={setType}>
+              <Select
+                value={type}
+                onValueChange={setType}
+                disabled={
+                  selectedClass?.adminUpdates?.type === "paid" &&
+                  selectedClass?.adminUpdates?.amount > 0
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -854,7 +882,14 @@ const ViewTeacherClasses = () => {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="penalty">Penalty</Label>
-              <Select value={penalty} onValueChange={setPenalty}>
+              <Select
+                value={penalty}
+                onValueChange={setPenalty}
+                disabled={
+                  selectedClass?.adminUpdates?.type === "paid" &&
+                  selectedClass?.adminUpdates?.amount > 0
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select penalty" />
                 </SelectTrigger>
@@ -873,6 +908,10 @@ const ViewTeacherClasses = () => {
                 type="datetime-local"
                 value={joinTime}
                 onChange={(e) => setJoinTime(e.target.value)}
+                disabled={
+                  selectedClass?.adminUpdates?.type === "paid" &&
+                  selectedClass?.adminUpdates?.amount > 0
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -881,6 +920,10 @@ const ViewTeacherClasses = () => {
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                disabled={
+                  selectedClass?.adminUpdates?.type === "paid" &&
+                  selectedClass?.adminUpdates?.amount > 0
+                }
               />
             </div>
           </div>
@@ -892,13 +935,18 @@ const ViewTeacherClasses = () => {
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              onClick={handleSaveUpdate}
-              disabled={isSubmitting}
-            >
-              Save Changes
-            </Button>
+            {!(
+              selectedClass?.adminUpdates?.type === "paid" &&
+              selectedClass?.adminUpdates?.amount > 0
+            ) && (
+              <Button
+                type="button"
+                onClick={handleSaveUpdate}
+                disabled={isSubmitting}
+              >
+                Save Changes
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

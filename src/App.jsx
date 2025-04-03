@@ -39,11 +39,16 @@ import CreateClassForm from "./pages/admin/CreateClassForm";
 import ViewTeacherClasses from "./pages/admin/ViewTeacherClasses";
 import TeacherCompletedClasses from "./pages/teacher/TeacherCompletedClasses";
 import TeacherClassDipute from "./pages/teacher/TeacherClassDispute";
+import ResetPassword from "./pages/ResetPassword";
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <Login />,
+  },
+  {
+    path: "/reset-password/:token",
+    element: <ResetPassword />,
   },
   {
     path: "/admin",
